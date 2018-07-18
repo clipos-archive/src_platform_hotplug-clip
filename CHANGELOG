@@ -1,0 +1,649 @@
+# CLIP ChangeLog for app-clip/hotplug-clip
+
+*hotplug-clip-2.6.2 (23 May 2018)
+
+  23 May 2018; Timothée Ravier <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.6.2.ebuild, -hotplug-clip-2.6.1-r1.ebuild:
+  Update scanner list.
+
+  19 Feb 2016; ANSSI <clipos@ssi.gouv.fr>
+  hotplug-clip-2.6.1-r1.ebuild:
+  Remove useless clipt-tiny USE flag.
+
+*hotplug-clip-2.6.0 (29 Apr 2015)
+
+  29 Apr 2015; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.6.0.ebuild, -hotplug-clip-2.5.30.ebuild:
+  Add powerdown support to device-admind.
+
+*hotplug-clip-2.5.30 (19 Mar 2015)
+
+  19 Mar 2015; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.30.ebuild, -hotplug-clip-2.5.29-r1.ebuild:
+  XIRING smartcard reader.
+
+*hotplug-clip-2.5.29-r1 (09 Mar 2015)
+
+  09 Mar 2015; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.29-r1.ebuild, -hotplug-clip-2.5.29.ebuild:
+  Completely drop dependency on xf86-input-synaptics, since it's in
+  clip-apps-conf.
+
+*hotplug-clip-2.5.29 (04 Mar 2015)
+
+  04 Mar 2015; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.29.ebuild, -hotplug-clip-2.5.28.ebuild:
+  Update printer subsystem to usbmisc (changed in Linux 3.6).
+
+
+  03 Feb 2015; ANSSI <clipos@ssi.gouv.fr>
+  hotplug-clip-2.5.28.ebuild:
+  No depending on xf86-input-synaptics on clip-tiny.
+
+*hotplug-clip-2.5.28 (14 Jan 2015)
+
+  14 Jan 2015; Alain Ozanne <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.28.ebuild, -hotplug-clip-2.5.27-r3.ebuild,
+  -files/touchpad_update_on_usb_change.patch:
+  modifications moved in clip-dev instead of patch.
+
+*hotplug-clip-2.5.27-r3 (14 Jan 2015)
+
+  14 Jan 2015; Alain Ozanne <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.27-r3.ebuild, -hotplug-clip-2.5.27-r2.ebuild:
+
+*hotplug-clip-2.5.27-r2 (14 Jan 2015)
+
+  14 Jan 2015; Alain Ozanne <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.27-r2.ebuild, -hotplug-clip-2.5.27-r1.ebuild:
+
+*hotplug-clip-2.5.27-r1 (13 Jan 2015)
+
+  13 Jan 2015; Alain Ozanne <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.27-r1.ebuild, -hotplug-clip-2.5.27.ebuild,
+  +files/touchpad_update_on_usb_change.patch:
+  to cope with the possibility of disabling the touchpad checks that at least one pointing device is always active.
+
+*hotplug-clip-2.5.27 (19 Nov 2014)
+
+  19 Nov 2014; Tony Cheneau <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.27.ebuild, -hotplug-clip-2.5.26.ebuild:
+  Fix regression caused by a change in the xrandr command behavior. It restores
+  the initial behavior when the screen configuration is reset when
+  plugging/unplugging a screen while the computer is sleeping.
+
+*hotplug-clip-2.5.26 (03 Nov 2014)
+
+  03 Nov 2014; Hugo Chargois <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.26.ebuild, -hotplug-clip-2.5.25.ebuild:
+  Show full mount point options for USB disks when clicking on the adeskbar
+  button, even if USB_MOUNT_CURRENT_LEVEL is true.
+
+*hotplug-clip-2.5.25 (05 Sep 2014)
+
+  05 Sep 2014; Tony Cheneau <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.25.ebuild, -hotplug-clip-2.5.24.ebuild:
+  Fix currently logged user detection. A change in last command behavior
+  prompted a fix.
+
+*hotplug-clip-2.5.24 (06 Aug 2014)
+
+  06 Aug 2014; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.24.ebuild, -hotplug-clip-2.5.23.ebuild:
+  Fix FTBFS on amd64 by including stdlib.h in eventd_netlink.c
+
+*hotplug-clip-2.5.23 (20 Jun 2014)
+
+  20 Jun 2014; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.23.ebuild, -hotplug-clip-2.5.22.ebuild:
+  Kill pulseaudio in jails when switching the sound context.
+
+*hotplug-clip-2.5.22 (17 Jun 2014)
+
+  17 Jun 2014; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.22.ebuild, -hotplug-clip-2.5.21.ebuild:
+  Fix sysfs perms fix when no battery is present.
+
+*hotplug-clip-2.5.21 (02 May 2014)
+
+  02 May 2014; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.21.ebuild, -hotplug-clip-2.5.20.ebuild:
+  Fix sysfs perms (make power_supply files readable for @admin,
+  for now) at startup, and when resuming from suspend to RAM.
+
+*hotplug-clip-2.5.20 (29 Apr 2014)
+
+  29 Apr 2014; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.20.ebuild, -hotplug-clip-2.5.19.ebuild:
+  Fix/workaround missing internal keyboard on resume on some
+  DELL laptops with a 3.13+ kernel.
+
+*hotplug-clip-2.5.19 (18 Apr 2014)
+
+  18 Apr 2014; Tony Cheneau <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.19.ebuild, -hotplug-clip-2.5.18.ebuild:
+  Fix a race condition when resuming from sleep.
+
+*hotplug-clip-2.5.18 (18 Apr 2014)
+
+  18 Apr 2014; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.18.ebuild, -hotplug-clip-2.5.17.ebuild:
+  Redirect standard input and outputs to /dev/null when running
+  external scripts.
+
+*hotplug-clip-2.5.17 (26 Mar 2014)
+
+  26 Mar 2014; Mickaël Salaün <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.17.ebuild, -hotplug-clip-2.5.16.ebuild:
+  Fix resume screen refreshing when no screen configuration changed.
+
+*hotplug-clip-2.5.16 (20 Mar 2014)
+
+  20 Mar 2014; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.16.ebuild, -hotplug-clip-2.5.15.ebuild:
+  Add support for configuration without X11.
+
+*hotplug-clip-2.5.15 (11 Feb 2014)
+
+  11 Feb 2014; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.15.ebuild, -hotplug-clip-2.5.14.ebuild:
+  Fix coldplug USB devices creation.
+
+*hotplug-clip-2.5.14 (24 Jan 2014)
+
+  24 Jan 2014; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.14.ebuild, -hotplug-clip-2.5.13-r1.ebuild:
+  Sound support - only allow access to the sound capture devices
+  if SOUND_CAPTURE is set to yes in the devices conf.
+
+*hotplug-clip-2.5.13-r1 (30 Dec 2013)
+
+  30 Dec 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.13-r1.ebuild, -hotplug-clip-2.5.13.ebuild:
+  Force rebuild to add openrc dependency.
+
+*hotplug-clip-2.5.11 (22 Nov 2013)
+
+  22 Nov 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.11.ebuild, -hotplug-clip-2.5.10.ebuild:
+  Mask sound devices with chmod in jails where they are not
+  available.
+
+*hotplug-clip-2.5.10 (24 Oct 2013)
+
+  24 Oct 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.10.ebuild, -hotplug-clip-2.5.9.ebuild:
+  Cleanup mkdevices script.
+
+*hotplug-clip-2.5.9 (14 Oct 2013)
+
+  14 Oct 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.9.ebuild, -hotplug-clip-2.5.8.ebuild,
+  files/_debian/postinst, files/_debian/prerm:
+  Switch to local.d snippets to start device-admind and event.
+
+*hotplug-clip-2.5.8 (14 Oct 2013)
+
+  14 Oct 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.8.ebuild, -hotplug-clip-2.5.7.ebuild,
+  files/_debian/postinst, files/_debian/prerm:
+  Improve init scripts compatibility with openrc.
+
+*hotplug-clip-2.5.7 (14 Oct 2013)
+
+  14 Oct 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.7.ebuild, -hotplug-clip-2.5.6.ebuild:
+  Add tty devices on freescale ARM boards.
+
+*hotplug-clip-2.5.6 (10 Oct 2013)
+
+  10 Oct 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.6.ebuild, -hotplug-clip-2.5.5.ebuild:
+  Update screens on resume from suspend to RAM.
+
+*hotplug-clip-2.5.5 (30 Sep 2013)
+
+  30 Sep 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.5.ebuild, -hotplug-clip-2.5.4.ebuild:
+  Use sysctl in switch-sound-context - works better with 
+  veriexec. Add forced heritable CAP_SYS_ADMIN on device-admind.
+
+*hotplug-clip-2.5.4 (25 Sep 2013)
+
+  25 Sep 2013; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.4.ebuild, -hotplug-clip-2.5.3.ebuild:
+  Fix code portability.
+
+*hotplug-clip-2.5.3 (28 Aug 2013)
+
+  28 Aug 2013; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.3.ebuild, -hotplug-clip-2.5.2.ebuild:
+  Added support of Macbook Air special keys.
+
+*hotplug-clip-2.5.2 (26 Aug 2013)
+
+  26 Aug 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.2.ebuild, -hotplug-clip-2.5.1.ebuild:
+  Add a last status delay check to avoid restarting a network
+  config if the interface was left unplugged for less than 
+  one minute.
+
+*hotplug-clip-2.5.1 (23 Aug 2013)
+
+  23 Aug 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.1.ebuild, -hotplug-clip-2.5.0.ebuild:
+  Restart any active network config when a non-admin interface
+  is plugged back in.
+
+*hotplug-clip-2.5.0 (05 Aug 2013)
+
+  05 Aug 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.5.0.ebuild, -hotplug-clip-2.4.4.ebuild:
+  Add device-admind and clip-device-request to manage devices
+  (soundcard only at the moment).
+
+*hotplug-clip-2.4.4 (01 Aug 2013)
+
+  01 Aug 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.4.4.ebuild, -hotplug-clip-2.4.3.ebuild:
+  Change sound devices ownership and perms to root:audio / 0660.
+
+*hotplug-clip-2.4.3 (05 Jun 2013)
+
+  05 Jun 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.4.3.ebuild, -hotplug-clip-2.4.2.ebuild:
+  Fix firmware loading, broken since 2.4.1 : do not warn kernel
+  when we do manage to load the firmware :)
+
+*hotplug-clip-2.4.2 (30 May 2013)
+
+  30 May 2013; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.4.2.ebuild, -hotplug-clip-2.4.1.ebuild:
+  Add support/detection for RATP/Navigo smartcard reader.
+
+*hotplug-clip-2.4.1 (25 Apr 2013)
+
+  25 Apr 2013; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.4.1.ebuild, -hotplug-clip-2.4.0.ebuild:
+  Warn kernel when we fail to load a firmware.
+
+*hotplug-clip-2.4.0 (17 Apr 2013)
+
+  17 Apr 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.4.0.ebuild, -hotplug-clip-2.3.5.ebuild:
+  Add socket handlers to eventd, and support suspend requests.
+
+*hotplug-clip-2.3.5 (03 Apr 2013)
+
+  03 Apr 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.3.5.ebuild, -hotplug-clip-2.3.4.ebuild:
+  Turn-off disconnected outputs in screen handler.
+
+*hotplug-clip-2.3.4 (05 Mar 2013)
+
+  05 Mar 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.3.4.ebuild, -hotplug-clip-2.3.3.ebuild:
+  Fix typo in screen handler.
+
+*hotplug-clip-2.3.3 (04 Mar 2013)
+
+  04 Mar 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.3.3.ebuild, -hotplug-clip-2.3.2.ebuild:
+  Smallish cosmetic fixes for net and screen scripts.
+  Fix image install path broken by configure update.
+
+*hotplug-clip-2.3.2 (04 Mar 2013)
+
+  04 Mar 2013; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.3.2.ebuild, -hotplug-clip-2.3.1.ebuild:
+  Up admin network interface as soon as posible.
+  Give CAP_NET_ADMIN to hotplugd.
+
+*hotplug-clip-2.3.1 (11 Feb 2013)
+
+  11 Feb 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.3.1.ebuild, -hotplug-clip-2.3.0.ebuild:
+  Screen handler - use separate commands for each output.
+  Seems to fix a bug where previous, all-in-one-go, command 
+  failed to change LVDS1 after a clean boot.
+
+*hotplug-clip-2.3.0 (11 Feb 2013)
+
+  11 Feb 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.3.0.ebuild, -hotplug-clip-2.2.10.ebuild:
+  Add support for screen hotplugging and activation.
+
+*hotplug-clip-2.2.10 (07 Jan 2013)
+
+  07 Jan 2013; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.10.ebuild, -hotplug-clip-2.2.9.ebuild:
+  Add patch to clip-device-notify, by Florent Chabaud from #339 
+  on clip-test, to work around status-monitor race conditions.
+
+*hotplug-clip-2.2.8 (22 Nov 2012)
+
+  22 Nov 2012; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.8.ebuild, -hotplug-clip-2.2.7.ebuild:
+  Add support for calling usb_modeswitch on wwan modules.
+  Add support for wwan tty called ttyUSB.
+
+*hotplug-clip-2.2.7 (13 Nov 2012)
+
+  13 Nov 2012; ANSSI <clipos@ssi.gouv.fr>
+   +hotplug-clip-2.2.7.ebuild -hotplug-2.2.6.ebuild:
+   Add PCSC notifications on add/remove. 
+
+*hotplug-clip-2.2.6 (07 Nov 2012)
+
+  07 Nov 2012; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.6.ebuild, -hotplug-clip-2.2.5.ebuild:
+  Add inputattach program and use it to enable touchscreen device on HP2760p.
+
+*hotplug-clip-2.2.5 (05 Oct 2012)
+
+  05 Oct 2012; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.5.ebuild, -hotplug-clip-2.2.4.ebuild:
+  Add support for video cameras.
+
+*hotplug-clip-2.2.4 (04 Oct 2012)
+ 04 Oct 2012; ANSSI <clipos@ssi.gouv.fr>
+ +hotplug-clip-2.2.4.ebuild -hotplug-2.2.3.ebuild:
+ Changed behaviour for correct handling of smartcard readers.
+
+*hotplug-clip-2.2.3 (05 Sep 2012)
+
+  05 Sep 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.3.ebuild, -hotplug-clip-2.2.2.ebuild:
+  Lessen 'notification storms' when switching network profiles
+  by doing delayed notification of net interface status updates.
+
+*hotplug-clip-2.2.2 (20 Jul 2012)
+
+  20 Jul 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.2.ebuild, -hotplug-clip-2.2.1.ebuild:
+  Fix brightness configuration, fix multiple PM entries for 
+  the same input device (i.e. both 'sleep' and 'power', or
+  'toshiba' and 'sleep'.
+
+*hotplug-clip-2.2.1 (19 Jul 2012)
+
+  19 Jul 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.1.ebuild, -hotplug-clip-2.2.0.ebuild:
+  Add support for Toshiba special keys.
+
+*hotplug-clip-2.2.0 (11 Jul 2012)
+
+  11 Jul 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.2.0.ebuild, -hotplug-clip-2.1.3.ebuild:
+  Support network link up/down notification.
+
+*hotplug-clip-2.1.3 (22 Jun 2012)
+
+  22 Jun 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.1.3.ebuild, -hotplug-clip-2.1.2.ebuild:
+  Fix mkdevices in case of leftover USB devices.
+
+*hotplug-clip-2.1.2 (20 Jun 2012)
+
+  20 Jun 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.1.2.ebuild, -hotplug-clip-2.1.1.ebuild:
+  Remove useless /dev/input/mice.
+
+*hotplug-clip-2.1.1 (06 Jun 2012)
+
+  06 Jun 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.1.1.ebuild, -hotplug-clip-2.1.0.ebuild:
+  Fix 'no_keyboard' detection.
+
+*hotplug-clip-2.1.0 (29 May 2012)
+
+  29 May 2012; Mickaël Salaün <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.1.0.ebuild, -hotplug-clip-2.0.21.ebuild:
+  Cleanup and fix input device handling at boot and hotplug.
+
+*hotplug-clip-2.0.20 (20 Feb 2012)
+
+  20 Feb 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.20.ebuild, -hotplug-clip-2.0.19.ebuild:
+  Remove overzealous debug message in eventd.
+
+*hotplug-clip-2.0.19 (15 Feb 2012)
+
+  15 Feb 2012; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.19.ebuild, -hotplug-clip-2.0.18.ebuild:
+  Eventd/input : try to fix waking up from sleep 
+  (missing keyboard device...) + bump max number of monitored
+  events to 16.
+
+*hotplug-clip-2.0.18 (13 Feb 2012)
+
+  13 Feb 2012; Yves-Alexis Perez <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.18.ebuild, -hotplug-clip-2.0.17-r1.ebuild:
+  Update touchscreen/tablet support and add a handler for tablet mode.
+
+*hotplug-clip-2.0.17 (09 Nov 2011)
+
+  09 Nov 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.17.ebuild, -hotplug-clip-2.0.16.ebuild:
+  Add preliminary support for touchscreen/tablet input devices.
+  Remove useless chvt in clip-input-notify, this was actually 
+  a bug in the clip backend.
+
+*hotplug-clip-2.0.15 (21 Oct 2011)
+
+  21 Oct 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.15.ebuild, -hotplug-clip-2.0.14.ebuild:
+  Add support for net interface hotplugging.
+
+*hotplug-clip-2.0.13 (05 Oct 2011)
+
+  05 Oct 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.13.ebuild, -hotplug-clip-2.0.12.ebuild:
+  Suspend : do not send a reconnect cmd to the keyboard driver
+  on non-DELL architectures.
+
+*hotplug-clip-2.0.12 (25 Aug 2011)
+
+  25 Aug 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.12.ebuild, -hotplug-clip-2.0.11.ebuild:
+  Do a sync before suspending, in case we never wake up 
+  afterwards.
+
+*hotplug-clip-2.0.11 (09 Aug 2011)
+
+  09 Aug 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.11.ebuild, -hotplug-clip-2.0.10.ebuild:
+  Fix Option ZeroCD detection - patch by Yves-Alexis Perez.
+
+*hotplug-clip-2.0.10 (20 Jul 2011)
+
+  20 Jul 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.10.ebuild, -hotplug-clip-2.0.9.ebuild:
+  Fix 'return -1', not supported with bash.
+
+*hotplug-clip-2.0.9 (13 Jul 2011)
+
+  13 Jul 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.9.ebuild, -hotplug-clip-2.0.8.ebuild:
+  Add new i8042 serio reset and new input device handling in 
+  clip-suspend, to deal with lost keyboards when resuming from
+  sleep. This requires giving CAP_MKNOD inheritable to eventd.
+
+*hotplug-clip-2.0.8 (12 Jul 2011)
+
+  12 Jul 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.8.ebuild, -hotplug-clip-2.0.7.ebuild:
+  Fix usb device type identification on removal - use symlinks
+  to identify scanners and smartcard readers among all the 
+  junk in /dev/bus/usb.
+
+*hotplug-clip-2.0.7 (07 Jul 2011)
+
+  07 Jul 2011; ANSSI <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.7.ebuild, -hotplug-clip-2.0.6.ebuild:
+  Add support for scanners (with notifications)
+
+*hotplug-clip-2.0.5 (20 Jun 2011)
+
+  20 Jun 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.5.ebuild, -hotplug-clip-2.0.4-r1.ebuild:
+  Fix usb_storage call on block device removal.
+
+*hotplug-clip-2.0.4-r1 (23 May 2011)
+
+  23 May 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.4-r1.ebuild, -hotplug-clip-2.0.4.ebuild:
+  Force rebuild...
+
+*hotplug-clip-2.0.4 (23 May 2011)
+
+  23 May 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.4.ebuild, -hotplug-clip-2.0.3.ebuild:
+  Cleanup leftover devices (USB and input) when resuming from
+  suspend.
+
+*hotplug-clip-2.0.3 (17 May 2011)
+
+  17 May 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.3.ebuild, -hotplug-clip-2.0.2.ebuild:
+  Fix input device notification in case of multiple entries.
+
+*hotplug-clip-2.0.2 (09 May 2011)
+
+  09 May 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.2.ebuild, -hotplug-clip-2.0.1.ebuild:
+  Add fuse device creation.
+
+*hotplug-clip-2.0.1 (29 Apr 2011)
+
+  29 Apr 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.1.ebuild, -hotplug-clip-2.0.0.ebuild:
+  Fix usb devdir initialization - make all devices readable by
+  pcscd (needed for it to actually work).
+  Add inheritable CAP_KILL to enable pcscd --hotplug.
+
+*hotplug-clip-2.0.0 (22 Mar 2011)
+
+  22 Mar 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-2.0.0.ebuild, -hotplug-clip-1.5.1.ebuild:
+  Cleanup scripts names and layout, add block device handler.
+  Switch to fully dynamic (tmpfs) /dev and /x11/dev, merge
+  all device creation init scripts into a single one (mkdevices).
+  Add user notifications for plugged / unplugged devices.
+
+*hotplug-clip-1.5.1 (08 Feb 2011)
+
+  08 Feb 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.5.1.ebuild, -hotplug-clip-1.5.0.ebuild:
+  Fix mkusbdevs dependencies.
+
+*hotplug-clip-1.5.0 (08 Feb 2011)
+
+  08 Feb 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.5.0.ebuild, -hotplug-clip-1.4.4.ebuild:
+  Merge all usb handlers (zerocd, smartcard readers) in a single
+  one. Create proper devices in /dev/bus/usb for all usb devices,
+  to fix pcscd and ozeroconf in various situations.
+
+*hotplug-clip-1.4.4 (04 Feb 2011)
+
+  04 Feb 2011; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.4.4.ebuild, -hotplug-clip-1.4.3.ebuild:
+  Really avoid suspending during reboot / halt sequence.
+
+*hotplug-clip-1.4.2 (25 Oct 2010)
+
+  02 Fev 2011; Benjamin Morin <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.4.3.ebuild, -hotplug-clip-1.4.2.ebuild:
+  Add smartcard reader productids and bugfix in scardreader.c
+
+*hotplug-clip-1.4.2 (25 Oct 2010)
+
+  25 Oct 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.4.2.ebuild, -hotplug-clip-1.4.1.ebuild:
+  Add a semaphore to protect concurrent accesses to firmware
+  loading interface.
+
+*hotplug-clip-1.4.1 (20 Jul 2010)
+
+  20 Jul 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.4.1.ebuild, -hotplug-clip-1.4.0.ebuild:
+  Add a chvt to X11 keyboard notification - seems to be needed
+  for this to work...
+
+*hotplug-clip-1.4.0 (19 Jul 2010)
+
+  19 Jul 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.4.0.ebuild, -hotplug-clip-1.3.5.ebuild:
+  Add keyboard hotplug (static and dynamic creation of device
+  nodes + notification of X11 if it is already running).
+  Cleanup names for suspend scripts.
+
+*hotplug-clip-1.3.5 (12 Jul 2010)
+
+  12 Jul 2010; Benjamin Morin <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.3.5.ebuild, -hotplug-clip-1.3.4.ebuild:
+  Added hotplug module for smartcard readers ; fixed zerocd module (uses the same MAJOR)
+
+*hotplug-clip-1.3.4 (24 Jun 2010)
+
+  24 Jun 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.3.4.ebuild, -hotplug-clip-1.3.3.ebuild:
+  Try to restore backlight brightness when resuming from suspend.
+  Make sure the X11 screen is blanked before suspending.
+
+*hotplug-clip-1.3.3 (17 Jun 2010)
+
+  17 Jun 2010; Mickaël Salaün <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.3.3.ebuild, -hotplug-clip-1.3.2.ebuild:
+  Change network start command with the new netup script.
+
+*hotplug-clip-1.3.2 (31 May 2010)
+
+  31 May 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.3.2.ebuild, -hotplug-clip-1.3.1.ebuild:
+  Suspend scripts - log network actions to syslog. Signal 
+  to user (if any) when network reconfiguration fails.
+
+*hotplug-clip-1.3.1 (27 May 2010)
+
+  27 May 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.3.1.ebuild, -hotplug-clip-1.3.0.ebuild:
+  Miscellaneous improvements to the suspend scripts.
+
+*hotplug-clip-1.3.0 (10 May 2010)
+
+  10 May 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.3.0.ebuild, -hotplug-clip-1.2.1.ebuild,
+  +files/_debian/postinst, +files/_debian/prerm:
+  Add eventd to manage input events.
+
+*hotplug-clip-1.2.1 (21 Apr 2010)
+
+  21 Apr 2010; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.2.1.ebuild, -hotplug-clip-1.1.1.ebuild:
+  Added:
+   - initrd hoplug firmware loader, only for firmware loading and 
+   not used at the moment but could replace scripts in initrd. 
+   N.B.: this was the 1.2.0 that was never commited into portage.
+   - Option ZeroCD deactivation support, based on sys-apps/ozerocdoff.
+
+*hotplug-clip-1.1.1 (27 Aug 2009)
+
+  27 Aug 2009; Vincent Strubel <clipos@ssi.gouv.fr>
+  +hotplug-clip-1.1.1.ebuild, -hotplug-clip-1.1.ebuild:
+  Fix printerdev script paths.
+
+*hotplug-clip-1.0 (20 Aug 2009)
+
+  20 Aug 2009; Benjamin Morin <clipos@ssi.gouv.fr>
+  Added printer support.
+
+*hotplug-clip-1.0 (03 Jun 2009)
+
+  03 Jun 2009; Vincent Strubel <clipos@ssi.gouv.fr>
+  hotplug-clip-1.0.ebuild:
+  Initial version. Generic kernel hotplug handler, replaces the
+  old custom handler from sys-apps/clip-usb-keys (<< 2.4). Provides
+  both the old usb token connect/disconnect handling, and a new 
+  firmware loading facility.

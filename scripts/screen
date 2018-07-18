@@ -1,0 +1,142 @@
+#!/usr/bin/perl
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# screen - CLIP screen hotplug handler
+# This script is called whenever a new screen is plugged in or
+# out. In tries to find the best common mode for all screens, 
+# and call xrandr to set that mode on all screens. If no common
+# mode is found, the script runs xrandr --auto for each output
+# to at least activate them.
+#
+# Copyright 2013 SGDSN/ANSSI
+# Author:
+#   Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved.
+#
+use strict;
+use warnings;
+
+use CLIP::Logger ':all';
+use Sys::Syslog qw(:macros);
+
+$g_log_prefix = "screen-handler";
+$g_log_debug = 0;
+$g_log_syslog = 1;
+$CLIP::Logger::g_facilities->{"warn"} = LOG_DAEMON;
+$CLIP::Logger::g_facilities->{"log"} = LOG_DAEMON;
+
+$ENV{"DISPLAY"} = ":0";
+$ENV{"XAUTHORITY"} = "/var/run/authdir/slim.auth";
+my $xrandr = "/usr/local/bin/xrandr";
+
+sub merror($) {
+	clip_warn shift; 
+	exit 1;
+}
+
+# First call xrandr to force it to refresh the list of connected screens.
+# This does nothing but restore the default mode on the first connected 
+# output (i.e. connected before any new screen was plugged), but it does
+# the trick to force xrandr to reparse outputs.
+sub refresh_xrandr() {
+	my $output = "";
+
+	open IN, "$xrandr --current |" or merror "Failed to run xrandr";
+	foreach my $line (<IN>) {
+		if ($line =~ /^(\S+) connected/) {
+			$output = $1;
+			last;
+		}
+	}
+	close IN;
+
+	unless ($output) {
+		clip_warn "No connected output. Good luck seeing this message :)";
+		exit 0;
+	}
+
+	# Don't error out here
+	system($xrandr, "--output", $output, "--auto") == 0 
+		or clip_warn "xrandr --auto failed";
+}
+	
+# Then re-read xrandr output, and try to find a common mode for 
+# all screens
+sub update_outputs() {
+	# outputs := hash : <output name> => ref to list of supported modes
+	my %outputs = ();
+	my $output = "";
+	my @disable = ();
+
+	open IN, "$xrandr --current |" or merror "Failed to run xrandr";
+	foreach my $line (<IN>) {
+		if ($line =~ /^(\S+) connected/) {
+			$output = $1;
+			$outputs{$output} = [];
+		} elsif ($line =~ /^(\S+) disconnected \d+x\d+/) {
+			# Disconnected output which is still active - turn it off...
+			push @disable, ($1);
+			$output = "";
+		} elsif ($line =~ /disconnected/) {
+			$output = "";
+		} elsif ($line =~ /^\s+(\d+x\d+)/ and $output) {
+			push @{$outputs{$output}}, ($1);
+		}
+	}
+	close IN;
+		
+	# intersect all the lists of supported modes, the perl way :
+	#  - build a hash keyed by all the supported modes, with the number
+	#    of outputs that support each mode as values
+	#  - those keys whose matching values correspond to the total number
+	#    of outputs are those supported by all outputs :)
+	my %counts;
+	my $num_outputs = keys %outputs;
+	foreach my $out (keys %outputs) {
+		foreach my $mode (@{$outputs{$out}}) {
+			$counts{$mode}++;
+	}
+	}
+
+	# extract best common mode : rather than a convoluted function, we
+	# simply build a new hash matching modes (values) and weights (keys)
+	# where the weight of a mode is calculated as width * height
+	my %ok_modes = ();
+	foreach my $mode (keys %counts) {
+		if ($counts{$mode} eq $num_outputs and $mode =~ /(\d+)x(\d+)/) {
+			$ok_modes{$1 * $2} = $mode;
+		}
+	}
+
+	my $top;
+	my @cmd = ($xrandr);
+	my @all_outputs = sort keys %outputs;
+	# if we have a non-empty list of common modes, select the best one
+	# and build a xrandr command to set it on every monitor
+	if (defined($top = (sort { $a <=> $b } keys %ok_modes)[-1])) {
+		my $best_mode = $ok_modes{$top};
+		foreach (@all_outputs) {
+			clip_log "Setting mode $best_mode on output $_.";
+			system ($xrandr, "--output", $_, "--mode", $best_mode) == 0
+				or clip_warn "xrandr command failed on output $_";
+		}
+	# otherwise (no common mode), set --auto on each connected output
+	} else {
+		foreach (@all_outputs) {
+			clip_log "No common mode, setting --auto on output $_.";
+			system ($xrandr, "--output", $_, "--auto") == 0
+				or clip_warn "xrandr command failed on output $_";
+		}
+	}
+	# turn off disconnected but still active outputs
+	foreach (@disable) {
+		clip_log "Turning off output $_, which is now disconnected";
+		system ($xrandr, "--output", $_, "--off") == 0
+				or clip_warn "xrandr command failed on output $_";
+	}
+}
+
+clip_logger_init();
+refresh_xrandr();
+sleep 2;
+update_outputs();

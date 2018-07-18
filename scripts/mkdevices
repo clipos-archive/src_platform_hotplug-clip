@@ -1,0 +1,319 @@
+#!/sbin/runscript
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# CLIP startup script to create extra devices
+# Copyright 2010-2013 SGDSN/ANSSI
+# Authors:
+#   Vincent Strubel <clipos@ssi.gouv.fr>
+#   Mickaël Salaün <clipos@ssi.gouv.fr>
+# All rights reserved.
+
+description="Create devices at boot time"
+
+depend() {
+	before reducecap pcscd
+	need localmount
+}
+
+EXTRA_DEV_SCRIPTS="/lib/devices.d"
+X11_DEVPATH="/dev/input"
+
+make_x11_devices() {
+	local -i ret=0
+	
+	make_std_devices "/x11/dev" "x11" || ret=1
+	make_graphic_devices "/x11/dev" || ret=1
+	mkdir -p "/x11/dev/input" || ret=1
+
+	return ${ret}
+}
+
+make_led_devices() {
+	[[ -f "/etc/conf.d/leds" ]] && source "/etc/conf.d/leds"
+	[[ -d "${LEDS_SYSPATH}" ]] || return 0
+	[[ -e "${LEDS_MAP}" ]] || return 0
+	
+	mkdir -p "/dev/leds"
+	local -i ret=0
+	local num=0
+	local name="" d
+	for d in "${LEDS_SYSPATH}/"*; do 
+		num="${d##*[a-z]}"
+		name="$(awk -vpat="${num}" '$1 == pat {print $2}' "${LEDS_MAP}")"
+		[[ -n "${name}" ]] || continue
+		einfo "LED ${num}: ${name}"
+		make_device 'c' "${d}" "/dev/leds" 0600 "${name}" || ret=1
+	done
+	return ${ret}
+}
+
+make_i2c_devices() {
+	local -i ret=0
+	local p
+	for p in /sys/class/i2c-dev/i2c-*; do
+		if [[ -d "${p}" && ! -e "/dev/$(basename "${p}")" ]]; then
+			make_device 'c' "${p}" "/dev" || ret=1
+		fi
+	done
+
+	return ${ret}
+}
+
+make_pm_event_dev() {
+	local -i idx=${1}
+	local tpe="${2}"
+	local maj="${3}"
+	local min="${4}"
+	local syscl="${5}"
+	local disp=""
+
+	local e="/sys/class/input/event${idx}"
+	local phybase="$(readlink -f "${e}/device")"
+	case "${tpe}" in
+		"lid")
+			disp="LID switch"
+			;;
+		"power")
+			disp="Power button"
+			;;
+		"sleep")
+			disp="Sleep button"
+			;;
+		"toshiba")
+			disp="Toshiba special keys"
+			;;
+		"thinkpad")
+			disp="Thinkpad extra buttons"
+			;;
+		"apple")
+			disp="Apple special keys"
+			;;
+		*)
+			ewarn "Unsupported PM type ${tpe} at event ${idx}"
+			return 1
+			;;
+	esac
+
+	local name=""
+	local -i num=0
+	while true; do
+		name="/dev/input/${tpe}${num}"
+		[[ -e "${name}" ]] || break
+		num=$(( ${num} + 1))
+	done
+
+	einfo "${disp} ${num} at event ${idx}"
+	mknod -m 0600 "${name}" c "${maj}" "${min}"
+	local -i ret=$?
+
+	# Store the corresponding /sys path (that of the full device, not the
+	# input class one) as a symlink, for use by Xorg on startup.
+	if [[ ${ret} -eq 0 && -n "${phybase}" ]]; then
+		local phyfile="${name}-syspath"
+		rm -f -- "${phyfile}"
+		ln -s -- "${phybase}" "${phyfile}"
+	fi
+	return ${ret}
+}
+
+# Identify power-management devices for core, 
+# input devices (keyboards and pointers for X11
+make_extra_input_devices() {
+	local -i ret=0 gret=0
+	local e
+	
+	for e in "/sys/class/input/"event*; do
+		[[ -e "${e}/dev" ]] || continue
+		local idx="${e##*event}"
+		local dev="$(<"${e}/dev")"
+		dev="${dev/:/ }"
+		local msg INIT DEVPATH
+
+		local name="$(<"${e}/device/name")"
+
+		if [[ "${name}" == "Toshiba input device" ]]; then
+			make_pm_event_dev "${idx}" "toshiba" ${dev} || gret=1
+			continue
+		elif [[ "${name}" == "ThinkPad Extra Buttons" ]]; then
+			make_pm_event_dev "${idx}" "thinkpad" ${dev} || gret=1
+			continue
+		elif [[ "${name}" == "applesmc" ]] ; then
+			make_pm_event_dev "${idx}" "apple" ${dev} || gret=1
+			continue
+		elif [[ "${name}" == "Apple, Inc. Apple Internal Keyboard / Trackpad" || "${name}" == "Apple Inc. Apple Internal Keyboard / Trackpad" ]] ; then
+			make_pm_event_dev "${idx}" "apple" ${dev} || gret=1
+			#this is the real keyboard, so the device has to be processed with the code below
+			###continue
+		fi
+
+		local tpes="$(input_gettype "${e}/device")"
+		[[ -n "${tpes}" ]] || continue
+
+		local tpe
+		for tpe in ${tpes}; do
+			ret=0
+			case "${tpe}" in
+				keyboard|mouse|touchpad|touchscreen|tablet|joystick|tabletmode)
+					[[ -z "${CLIP_NO_X11}" ]] || continue
+					einfo "Input ${tpe} device at event ${idx}"
+					DEVPATH="$(readlink -f -- ${e})"
+					INIT="yes" DEVPATH="${DEVPATH##/sys}" /lib/hotplug.d/input add || ret=1
+					[[ ${ret} -eq 0 ]] || gret=1
+					;;
+				lid|power|sleep)
+					make_pm_event_dev "${idx}" "${tpe}" ${dev} || gret=1
+					;;
+				*)
+					ewarn "Unknow device type ${tpe} at ${idx}"
+					continue
+					;;
+			esac
+		done
+	done
+
+	return ${gret}
+}
+
+USB_DEVICES="/sys/bus/usb/devices/*"
+USB_DEVDIR="/dev/bus/usb/"
+
+# Populate /dev/bus/usb 
+make_usb_devdir() {
+	local -i ret=0
+	rm -fr "${USB_DEVDIR}" # clean up any leftover devs
+	mkdir -p "${USB_DEVDIR}"
+	local devpath
+	for devpath in ${USB_DEVICES} ; do
+		if [[ -d "${devpath}" ]]; then
+			if [[ -e "${devpath}/dev" ]]; then
+				# Do not error out here
+				DEVPATH="${devpath#/sys}" /lib/hotplug.d/usb add || ret=1
+			fi
+		fi
+	done
+
+	return ${ret}
+}
+
+# Create tty* devices for 3G modules
+make_extra_tty_devices() {
+	local -i ret=0
+	local p
+	for p in "/sys/class/tty"/ttyHS* "/sys/class/tty"/ttyACM* ; do
+		if [[ -d "${p}" && ! -e "/dev/$(basename "${p}")" ]]; then
+			make_device 'c' "${p}" "/dev" || ret=1
+		fi
+	done
+
+	return ${ret}
+}
+
+make_extra_block_devices() {
+	local -i ret=0
+	local jail
+	for jail in ${CLIP_JAILS}; do
+		local path="/mounts/vsdev/${jail}"
+		rm -f "${path}/user_devs/fuse" "${path}/jail_devs/fuse" 2>/dev/null
+		make_fuse_device "${path}/user_devs" || ret=1
+		make_fuse_device "${path}/jail_devs" || ret=1
+	done
+
+	return ${ret}
+}
+
+check_keyboard() {
+	# If no keyboard or on the GD DuoTouch II (BASIC)
+	if [[ ! -c "/x11/dev/input/keyboard0" ]] || grep -q "GD_GoBook_DuoTouch" "/etc/core/machine" ; then
+		: > "/usr/local/var/no_keyboard"
+	else
+		[[ -f "/usr/local/var/no_keyboard" ]] && rm -f "/usr/local/var/no_keyboard"
+	fi
+}
+
+enable_serial_wacom() {
+	if grep -q "HP_2760p" /etc/core/machine; then
+		# TODO: check if there's no side effect with WWAN devices
+		mknod /dev/ttyS0 c 4 64
+		/sbin/inputattach --daemon --w8001 /dev/ttyS0
+	fi
+}
+
+make_serial_tty() {
+	local -i ret=0
+	local p
+
+	#make serial freescale mxc
+	for p in "/sys/class/tty"/ttymxc*; do
+		if [[ -d "${p}" && ! -e "/dev/$(basename "${p}")" ]]; then
+			make_device 'c' "${p}" "/dev" || ret=1
+		fi
+	done
+	#make serial globalscale mirabox
+	for p in /sys/devices/soc.*/internal-regs.*/*.serial/tty/ttyS* ; do
+		if [[ -d "${p}" && ! -e "/dev/$(basename "${p}")" ]]; then
+			make_device 'c' "${p}" "/dev" || ret=1
+		fi
+	done
+	return ${ret}
+}
+
+start() {
+	source "/lib/clip/devices.sub"
+	[[ -f "/etc/conf.d/clip" ]] && source "/etc/conf.d/clip"
+
+	if [[ -z "${CLIP_NO_X11}" ]] ; then
+		ebegin "Updating device tree"
+		if ! mount -t tmpfs -o nosuid,noexec,noatime,mode=0755 x11dev "/x11/dev"; then
+			eend 1 "Failed to mount /x11/dev"
+			return 1
+		fi
+		if ! make_x11_devices; then
+			eend 1 "Failed to create X11 devices"
+			return 1
+		fi
+	else
+		make_serial_tty || ret=1
+	fi
+
+	rm -f /dev/input/*
+
+	local -i ret=0
+	eindent
+	enable_serial_wacom
+	make_extra_input_devices || ret=1
+	make_usb_devdir || ret=1
+	make_extra_tty_devices || ret=1
+	make_extra_block_devices || ret=1
+	check_keyboard 
+
+	# external script : adjust sysfs permissions
+	clip-sysfs-perms || ret=1
+
+	local script
+	for script in "${EXTRA_DEV_SCRIPTS}"/*; do
+		if [[ -f "${script}" ]]; then
+			"${script}" start || ewarn "Extra devices script $(basename ${script}) failed"
+		fi
+	done
+
+	make_led_devices || ret=1
+
+	make_i2c_devices || ret=1
+
+	eoutdent
+
+	eend $ret
+}
+
+stop() {
+	local script
+	for script in "${EXTRA_DEV_SCRIPTS}"/*; do
+		if [[ -f "${script}" ]]; then
+			"${script}" stop || ewarn "Extra devices script $(basename ${script}) failed"
+		fi
+	done
+
+	[[ -e "/x11/dev" ]] && ( umount "/x11/dev" || ewarn "Failed to unmount /x11/dev" )
+}
+
+# vim:ts=4:sw=4

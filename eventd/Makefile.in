@@ -1,0 +1,103 @@
+################# configure part ##############################
+
+
+CC = @CC@
+srcdir = @srcdir@
+SHELL = @SHELL@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@ 
+PREFIX = @prefix@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+debug = @debug@
+
+CFLAGS += -DVERSION=${VERSION} -DSBINDIR=\"${sbindir}\" -DBINDIR=\"${bindir}\" -Wno-sign-compare
+IFLAGS += -I ../common
+
+EVENTD_SRC :=  eventd.c eventd_input.c eventd_netlink.c eventd_socket.c
+EVENTD := eventd
+EVENTD_LDADD := ../common/obj/common.o -lclip
+
+SUSPEND_SRC := clip-suspend-request.c
+SUSPEND := clip-suspend-request
+SUSPEND_LDADD := 
+
+BIN_SCRIPTS := clip-device-notify clip-fnkeys-handler clip-suspend clip-suspend-xlock clip-sysfs-perms
+SBIN_SCRIPTS := 
+
+BIN_BINARIES := ${SUSPEND}
+SBIN_BINARIES := ${EVENTD}
+
+BINARIES := ${SBIN_BINARIES} ${BIN_BINARIES}
+BIN_EXES := ${BIN_BINARIES} ${BIN_SCRIPTS}
+SBIN_EXES := ${SBIN_BINARIES} ${SBIN_SCRIPTS}
+
+.PHONY: all 
+
+all: build
+
+###############################################################
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+OBJS_DIR ?= obj
+EVENTD_OBJFILES := ${foreach file, ${patsubst %.c,%.o,${EVENTD_SRC}}, ${OBJS_DIR}/${file}}
+SUSPEND_OBJFILES := ${foreach file, ${patsubst %.c,%.o,${SUSPEND_SRC}}, ${OBJS_DIR}/${file}}
+
+DEPS_DIR = ${OBJS_DIR}/.deps
+EVENTD_DEPFILES := ${foreach file, ${basename ${EVENTD_SRC}}, ${DEPS_DIR}/${file}.d}
+SUSPEND_DEPFILES := ${foreach file, ${basename ${SUSPEND_SRC}}, ${DEPS_DIR}/${file}.d}
+
+OBJFILES := ${EVENTD_OBJFILES} ${SUSPEND_OBJFILES}
+DEPFILES := ${EVENTD_DEPFILES} ${SUSPEND_DEPFILES}
+
+
+###############################################################
+.PHONY: build clean mrproper maintainer-clean
+
+${OBJS_DIR}:
+	mkdir -p ${OBJS_DIR}
+
+${DEPS_DIR}:
+	mkdir -p ${DEPS_DIR}
+
+${OBJS_DIR}/%.o:%.c Makefile
+	@${ECHO} "        CC                $<"
+	$(CC) $(CFLAGS) $(IFLAGS) -MT $@ -MD -MP -MF ${DEPS_DIR}/$*.d -c -o $@ $<
+
+${EVENTD}: ${EVENTD_OBJFILES} 
+	@${ECHO} "        LD                $@"
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ${EVENTD_LDADD}
+
+${SUSPEND}: ${SUSPEND_OBJFILES} 
+	@${ECHO} "        LD                $@"
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ${SUSPEND_LDADD}
+
+build: ${OBJS_DIR} ${DEPS_DIR} ${BINARIES}
+
+install: build
+	list='$(SBIN_EXES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${sbindir}/$$exe" ;\
+		install -D $$exe ${DESTDIR}${sbindir}/$$exe ;\
+	done
+	list='$(BIN_EXES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${bindir}/$$exe" ;\
+		install -D $$exe ${DESTDIR}${bindir}/$$exe ;\
+	done
+
+clean:
+	@${ECHO} "        CLEAN             ${BINARIES} ${OBJFILES}"
+	rm -f ${BINARIES} ${OBJFILES} ${DEPFILES} 
+
+mrproper: clean
+	rmdir ${DEPS_DIR} ${OBJS_DIR}
+	rm -f Makefile
+
+
+-include ${DEPFILES}

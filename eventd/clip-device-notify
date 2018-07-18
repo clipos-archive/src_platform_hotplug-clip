@@ -1,0 +1,212 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# CLIP script to notify user of plugged/unplugged devices
+# Copyright 2010-2013 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved.
+
+ACTION="${1}"
+TYPE="${2}"
+ICON_PATH="/usr/share/hotplug/img"
+
+[[ -n "${ACTION}" ]] || exit 1
+
+AUTHORITY="/home/user/.Xauthority"
+STATUSDIR="/var/run"
+
+CUR_USER="$(last -w -f /var/run/utmp | awk '$2 ~ /^:0/ { print $1 }' | head -n 1)"
+[[ -n "${CUR_USER}" ]] || exit 1
+
+CUR_UID=$(id -u ${CUR_USER})
+[[ -n "${CUR_UID}" ]] || exit 1
+
+NOTIFY="/usr/local/bin/notify.sh"
+
+[[ -x "${NOTIFY}" ]] || exit 0
+
+find_interface() {
+	local index="${1}"
+
+	for itf in /sys/class/net/*; do
+		if [[ $(<"${itf}/ifindex" ) == "${index}" ]]; then
+			echo -n "${itf##*/}"
+			return 0
+		fi
+	done
+	echo -n "-"
+	return 1
+}
+
+# Restart an active network config after the interface has been
+# reconnected.
+check_restart_netconf() {
+	local iface="${1}"
+	# Don't reactivate unless ipsec service was already running
+	local ipsec_pid="$(pgrep -x starter)"
+	[[ -n "${ipsec_pid}" ]] || return 0
+
+	# Don't reactivate if we don't have a current profile
+	local netconf="$(readlink /etc/admin/conf.d/netconf)"
+	[[ -n "${netconf}" ]] || return 0
+
+	# Don't reactivate unless interface has been down for at least
+	# 60 seconds
+	local statusfile="${STATUSDIR}/${iface}"
+	local -i lastupdate=$(stat --printf '%Y' "${statusfile}")
+	local -i now=$(date '+%s')
+	local -i delay=$(( ${now} - ${lastupdate} ))
+	[[ ${delay} -ge 60 ]] || return 0
+
+
+	source "/etc/conf.d/net" # get ADMIN_IF
+	# We don't reactivate the config when the admin interface is
+	# plugged / unplugged - this is handled separately
+	if [[ -n "${ADMIN_IF}" && "${iface}" == "eth${ADMIN_IF}" ]]; then
+		return 0
+	fi
+
+	netconf="${netconf##*/}"
+
+	# if a config was already started, restart it through the network 
+	# config
+	local icon="/usr/local/share/icons/network-connect.png"
+	vsctl user enter -u "${CUR_UID}" -- \
+		"${NOTIFY}" "${AUTHORITY}" \
+		-u low -t 4000 -i "${icon}" \
+		-- "Réactivation réseau" \
+		"Le profil réseau ${netconf} va être réactivé, veuillez patienter."
+
+	local title="" 
+	local msg=""
+	netd-client -s /var/run/netd	
+	if [[ $? -eq 0 ]]; then
+		title="Réseau réactivé"
+		msg="Le profil réseau ${netconf} a été réactivé."
+	else
+		title="Erreur réseau"
+		msg="Une erreur s'est produite lors de la réactivation du profil réseau ${netconf}."
+		icon="/usr/local/share/icons/network-disconnect.png"
+	fi
+
+	vsctl user enter -u "${CUR_UID}" -- \
+		"${NOTIFY}" "${AUTHORITY}" \
+		-u low -t 4000 -i "${icon}" \
+		-- "${title}" "${msg}"
+}
+
+DO_CHECK_RESTART="no"
+
+#special case for net interface : add/remove have a different meaning
+if [[ "${TYPE}" == "net-interface" ]]; then
+	INDEX="${3}"
+	STATUS="${4}"
+	IFACE=$(find_interface "${INDEX}")
+	case "${ACTION}" in
+		add)
+			OLDSTATUS=
+			STATUSFILE="${STATUSDIR}/${IFACE}"
+			[[ -f "${STATUSFILE}" ]] && OLDSTATUS="$(cat "${STATUSFILE}")"
+			if [[ "${STATUS}" != "${OLDSTATUS}" ]]; then
+				if [[ "${STATUS}" == "up" ]]; then
+					TITLE="Interface réseau connectée"
+					MSG="L'interface réseau ${IFACE} a été connectée."
+					ICON="connect"
+					DO_CHECK_RESTART="yes"
+				else 
+					TITLE="Interface réseau déconnectée"
+					MSG="L'interface réseau ${IFACE} a été déconnectée."
+					ICON="disconnect"
+				fi
+			fi
+			;;
+		remove)
+			TITLE="Interface réseau supprimée"
+			MSG="Une interface réseau a été supprimée."
+			ICON="wired"
+			;;
+		*)
+			exit 1
+			;;
+	esac
+	ICON="/usr/local/share/icons/network-${ICON}.png"
+
+	vsctl user enter -u "${CUR_UID}" -- \
+		"${NOTIFY}" "${AUTHORITY}" \
+		-u low -t 4000 -i "${ICON}" \
+		-- "${TITLE}" "${MSG}"
+
+	if [[ "${DO_CHECK_RESTART}" == "yes" ]]; then
+		check_restart_netconf "${IFACE}"
+	fi
+
+	if [[ -n "${STATUSFILE}" ]]; then
+		echo "${STATUS}" > "${STATUSFILE}"
+		chmod 644 "${STATUSFILE}"
+	fi
+	exit 0
+fi
+	
+case "${TYPE}" in 
+	keyboard)
+		TYPE="clavier"
+		ICON="input-keyboard"
+		;;
+	mouse)
+		TYPE="souris"
+		ICON="input-mouse"
+		;;
+	touchpad)
+		TYPE="pavé tactile"
+		ICON="input-mouse"
+		;;
+	tablet)
+		TYPE="tablette"
+		ICON="input-mouse"
+		;;
+	touchscreen)
+		TYPE="écran tactile"
+		ICON="input-mouse"
+		;;
+	3g)
+		TYPE="clé 3G"
+		ICON="network-wireless"
+		;;
+	printer)
+		TYPE="imprimante USB"
+		ICON="printer"
+		;;
+	scardreader)
+		TYPE="lecteur de carte à puce"
+		ICON="smartcard"
+		;;
+	scanner)
+		TYPE="scanner"
+		ICON="scanner"
+		;;
+	*)
+		exit 1
+		;;
+esac
+
+ICON="${ICON_PATH}/${ICON}.png"
+	
+case "${ACTION}" in
+	add)
+		TITLE="Nouveau périphérique (${TYPE})"
+		MSG="Un nouveau périphérique de type ${TYPE} a été détecté par le système."
+		;;
+	remove)
+		TITLE="Périphérique déconnecté (${TYPE})"
+		MSG="Un périphérique de type ${TYPE} a été déconnecté du système."
+		;;
+	*)
+		exit 1
+		;;
+esac
+
+vsctl user enter -u "${CUR_UID}" -- \
+	"${NOTIFY}" "${AUTHORITY}" \
+	-u low -t 4000 -i "${ICON}" \
+	-- "${TITLE}" "${MSG}"
+	

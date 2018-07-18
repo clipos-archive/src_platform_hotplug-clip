@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Copyright 2010-2013 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# Distributed under the terms of the GNU General Public License v2
+
+start-stop-daemon --stop \
+	-x /sbin/eventd
+start-stop-daemon --stop \
+	-x /sbin/device-admind
+
+exit 0
+# vim:ts=4

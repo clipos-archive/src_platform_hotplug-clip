@@ -1,0 +1,243 @@
+# -*- sh -*-
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# CLIP device creation functions.
+# Copyright (C) 2011 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved.
+
+make_device() {
+	local type="${1}" # 'b' / 'c'
+	local path="${2}" # "/sys/class/..." device path
+	local dest="${3}" # Where to create the device
+	local mode="${4}" # Optional mode for the created device (default 0600)
+	local name="${5}" # Optional name for the created device
+
+	if [[ -z "${dest}" ]]; then
+		echo "make_device: missing parameter" >&2
+		return 1
+	fi
+
+	[[ -n "${mode}" ]] || mode="0600"
+	[[ -n "${name}" ]] || name="${path##*/}"
+
+	if [[ ! -e "${path}/dev" ]]; then
+		echo "make_device: no such file ${path}/dev" >&2
+		return 1
+	fi
+
+	if ! mknod -m "${mode}" "${dest}/${name}" "${type}" $(sed -e 's/:/ /' "${path}/dev"); then
+		echo "make_device ${dest}/${name} from ${path} - mknod failed" >&2
+		return 1
+	fi
+}
+
+make_fuse_device() {
+	local dest="${1}"
+
+	if [[ -e "/sys/class/misc/fuse" ]]; then
+		make_device 'c' "/sys/class/misc/fuse" "${dest}" "0666"
+	fi
+}
+
+make_block_devices() {
+	local dest="${1}" # ex. '/dev'
+	local ret=0
+
+	local dev
+	for dev in "/sys/class/block"/*; do
+		if [[ -d "${dev}" ]]; then
+			make_device 'b' "${dev}" "${dest}" || ret=1
+		fi
+	done
+
+	make_fuse_device "${dest}" || ret=1
+	
+	return ${ret}
+}
+
+make_sound_card_devices() {
+	local path="${1}" # ex. '/sys/class/sound/card0'
+	local dest="${2}" # ex. '/dev'
+
+	if [[ ! -d "${path}" ]]; then
+		echo "make_sound_card_devices: no such directory ${path}"
+		return 1
+	fi
+
+	mkdir -p "${dest}/snd"
+	chown root:audio "${dest}/snd"
+	chmod 700 "${dest}/snd"
+
+	local ret=0 p
+	for p in "${path}"/controlC* "${path}"/pcmC*; do
+		if [[ -d "${p}" ]]; then
+			make_device 'c' "${p}" "${dest}/snd" '0600' || ret=1
+		fi
+	done
+
+	local timer="$(dirname "${path}")/timer" # N.B. : shared, but needed 
+	if [[ -d "${timer}" ]]; then
+		make_device 'c' "${timer}" "${dest}/snd" '0600' 2>/dev/null # Might already exist
+	fi
+
+	chown root:audio "${dest}/snd"/*
+
+	return ${ret}
+}
+
+make_std_devices() {
+	local dest="${1}" # ex. '/dev'
+	local type="${2}" # 'core', 'x11' or nothing
+
+	local ret=0
+
+	mkdir -p "${dest}/pts" "${dest}/shm" "${dest}/mapper" || ret=1
+	ln -sf "pts/ptmx" "${dest}/ptmx" || ret=1
+	ln -sf "/proc/self/fd" "${dest}/fd" || ret=1
+	ln -sf "fd/0" "${dest}/stdin" || ret=1
+	ln -sf "fd/1" "${dest}/stdout" || ret=1
+	ln -sf "fd/2" "${dest}/stderr" || ret=1
+
+	mknod -m 0666 "${dest}/null" c 1 3 || ret=1
+	mknod -m 0666 "${dest}/zero" c 1 5 || ret=1
+	mknod -m 0666 "${dest}/full" c 1 7 || ret=1
+	mknod -m 0644 "${dest}/urandom" c 1 9 || ret=1
+
+	mknod -m 0666 "${dest}/tty" c 5 0 || ret=1
+
+	case "${type}" in 
+		core) 
+			mknod -m 0600 "${dest}/mem" c 1 1 || ret=1
+			mknod -m 0600 "${dest}/random" c 1 8 || ret=1
+			mknod -m 0600 "${dest}/veriexec" c 1 14 || ret=1
+			mknod -m 0600 "${dest}/devctl" c 1 15 || ret=1
+			mknod -m 0600 "${dest}/console" c 5 1 || ret=1
+			mknod -m 0600 "${dest}/mapper/control" c 10 63 || ret=1
+			mkdir -p "${dest}/bus/usb" || ret=1
+
+			local p
+			for p in "/sys/class/rtc"/rtc[0-9]; do
+				if [[ -d "${p}" ]]; then
+					make_device 'c' "${p}" "${dest}" || ret=1
+				fi
+			done
+			ln -sf "rtc0" "${dest}/rtc" || ret=1
+			;;
+		x11)
+			mknod -m 0600 "${dest}/mem" c 1 1 || ret=1
+			mknod -m 0600 "${dest}/tty7" c 4 7 || ret=1
+			ln -sf "urandom" "${dest}/random" || ret=1
+			;;
+		*)
+			ln -sf "urandom" "${dest}/random" || ret=1
+			;;
+	esac
+
+	return ${ret}
+}
+
+make_input_devices() {
+	local dest="${1}" # ex. '/dev'
+	local ret=0 p
+
+	mkdir -p "${dest}/input" || ret=1
+
+	for p in "/sys/class/input"/*; do
+		if [[ -d "${p}" && -e "${p}/dev" ]]; then
+			make_device 'c' "${p}" "${dest}/input" || ret=1
+		fi
+	done
+
+	return ${ret}
+}
+
+make_graphic_devices() {
+	local dest="${1}" # ex. '/dev'
+	local ret=0
+
+	mkdir -p "${dest}/dri" || ret=1
+	for p in "/sys/class/drm"/card[0-9]; do
+		if [[ -d "${p}" ]]; then
+			make_device 'c' "${p}" "${dest}/dri" || ret=1
+		fi
+	done
+
+	for p in "/sys/class/graphics"/fb[0-9]; do
+		if [[ -d "${p}" ]]; then
+			make_device 'c' "${p}" "${dest}" || ret=1
+		fi
+	done
+
+	return ${ret}
+}
+
+make_consoles() {
+	local dest="${1}"
+	local ret=0 i
+
+	for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+		mknod -m 0600 "${dest}/tty$i" c 4 $i || ret=1
+		mknod -m 0600 "${dest}/vcs$i" c 7 $i || ret=1
+		mknod -m 0600 "${dest}/vcsa$i" c 7 $(( $i + 128 )) || ret=1
+	done
+	ln -sf "vcs0" "${dest}/vcs" || ret=1
+
+	return ${ret}
+}
+
+# Note : make_std_devices must be called explicitly beforehand (and before loading
+# modules)
+make_boot_devices() {
+	local dest="${1}"
+	local ret=0
+
+	if ! make_block_devices "${dest}"; then
+		echo "Failed to create block devices in ${dest}" >&2
+		ret=1
+	fi
+
+	if ! make_input_devices "${dest}"; then
+		echo "Failed to create input devices in ${dest}" >&2
+		ret=1
+	fi
+
+	if ! make_graphic_devices "${dest}"; then
+		echo "Failed to create graphic devices in ${dest}" >&2
+		ret=1
+	fi
+
+	if ! make_consoles "${dest}"; then
+		echo "Failed to create consoles in ${dest}" >&2
+		ret=1
+	fi
+
+	return ${ret}
+}
+
+remove_leftover_device() {
+	local dev="${1}"
+
+	[[ -e "${dev}" ]] || return 1
+
+	local tpe="$(ls -Ll "${dev}" | head -c 1)"
+	local minmaj="$(ls -Ll "${dev}" | awk '{print $5$6}')"
+	minmaj="${minmaj/,/:}"
+	local syspath=""
+	case "${tpe}" in
+		c)
+			syspath="/sys/dev/char/${minmaj}"
+			;;
+		b)
+			syspath="/sys/dev/block/${minmaj}"
+			;;
+		*)
+			echo "Not a device : ${dev}" >&2
+			return 1
+			;;
+	esac
+
+	[[ -e "${syspath}" ]] && return 2
+
+	rm -f "${dev}"
+}

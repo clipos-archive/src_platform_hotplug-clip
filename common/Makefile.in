@@ -1,0 +1,65 @@
+################# configure part ##############################
+
+
+CC = @CC@
+srcdir = @srcdir@
+SHELL = @SHELL@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@ 
+PREFIX = @prefix@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+sbindir = @sbindir@
+debug = @debug@
+
+COMMON_SRC := common.c
+
+.PHONY: all 
+
+all: build
+
+###############################################################
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+OBJS_DIR ?= obj
+COMMON_OBJFILES := ${foreach file, ${patsubst %.c,%.o,${COMMON_SRC}}, ${OBJS_DIR}/${file}}
+
+DEPS_DIR = ${OBJS_DIR}/.deps
+COMMON_DEPFILES := ${foreach file, ${basename ${COMMON_SRC}}, ${DEPS_DIR}/${file}.d}
+
+OBJFILES := ${COMMON_OBJFILES} 
+DEPFILES := ${COMMON_DEPFILES}
+
+
+###############################################################
+.PHONY: build clean mrproper maintainer-clean
+
+${OBJS_DIR}:
+	mkdir -p ${OBJS_DIR}
+
+${DEPS_DIR}:
+	mkdir -p ${DEPS_DIR}
+
+${OBJS_DIR}/%.o:%.c Makefile
+	@${ECHO} "        CC                $<"
+	$(CC) $(CFLAGS) $(IFLAGS) -MT $@ -MD -MP -MF ${DEPS_DIR}/$*.d -c -o $@ $<
+
+build: ${OBJS_DIR} ${DEPS_DIR} ${OBJFILES}
+
+install: build
+
+clean:
+	@${ECHO} "        CLEAN             ${OBJFILES}"
+	rm -f ${OBJFILES} ${DEPFILES} 
+
+mrproper: clean
+	rmdir ${DEPS_DIR} ${OBJS_DIR}
+	rm -f Makefile
+
+
+-include ${DEPFILES}

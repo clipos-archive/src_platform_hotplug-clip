@@ -1,0 +1,192 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# input - CLIP hotplug input device addition/removal script 
+# This creates / removes the X11 input devices as needed, 
+# then notifies X11 (if it is running) through the CLIP-specific
+# X11 config backend.
+#
+# Copyright 2010-2011 SGDSN/ANSSI
+# Authors:
+#   Vincent Strubel <clipos@ssi.gouv.fr>
+#   Mickaël Salaün <clipos@ssi.gouv.fr>
+# All rights reserved.
+#
+
+ROOT_PATH="/dev/input"
+X11_PATH="/x11/dev/input"
+X11_SOCKPATH="/mounts/x11_priv/var/run/inputdev"
+
+warn() {
+	logger -p daemon.warning "hotplug/input: ${1}"
+}
+
+info() {
+	logger -p daemon.info "hotplug/input: ${1}"
+}
+
+x11_notify() {
+	if [[ -z "${INIT}" ]]; then
+		[[ "${X11_SOCKPATH}" ]] && clip-input-notify "$@"
+	else
+		warn "Failed to notify X11"
+	fi
+}
+
+user_notify() {
+	if [[ -z "${INIT}" ]]; then
+		[[ -e "${X11_SOCKPATH}" ]] && clip-device-notify "$@"
+	fi
+}
+
+# Find a device in ${path} matching the major and minor numbers 
+# ${major} and ${minor}
+find_device() {
+	local path="${1}"
+	local maj="${2}"
+	local min="${3}"
+
+	local bn="$(ls -l "${path}" | awk -vmaj="${maj}," -vmin="${min}" '$5 == maj && $6 == min {print $10}')"
+
+	[[ -n "${bn}" ]] && echo -n "${path}/${bn}"
+}
+
+# Extract <major>:<minor> from a hotplug DEVPATH
+get_devnum() {
+	local devpath="${1}"
+
+	head -n 1 "/sys/${devpath}"/event*/dev 2>/dev/null
+}
+
+# Find the first available device node as ${path}/${base}[0 ... N]
+find_free_slot() {
+	local path="${1}"
+	local base="${2}"
+
+	local -i i=0
+
+	while true; do
+		if [[ -e "${path}/${base}${i}" ]]; then
+			let "i+=1"
+			continue
+		fi
+		echo -n "${path}/${base}${i}"
+		return 0
+	done
+}
+
+# Create a device node of major / minor ${maj} / ${min} under ${path}/${base}[0...N]
+create_device() {
+	local path="${1}"
+	local base="${2}"
+	local maj="${3}"
+	local min="${4}"
+
+	local new="$(find_free_slot "${path}" "${base}")"
+	if [[ -z "${new}" ]]; then
+		warn "No free slot for ${maj} - ${min} as ${path}/${base}X ??"
+		return 1
+	fi
+
+	if mknod -m 0640 "${new}" c "${maj}" "${min}"; then
+		info "Added ${maj}:${min} as ${new}"
+		echo "${new}"
+		return 0
+	else
+		warn "Failed to add ${maj} - ${min} as ${new}"
+		return 1
+	fi
+}
+
+# Create a keyboard device node and notify X11
+add_device() {
+	[[ -n "${DEVPATH}" ]] || return 1
+	local bn="${DEVPATH##*/}"
+	[[ "${bn%event*}" == "${bn}" ]] && return 1
+	local idx="${bn##*event}"
+
+	DEVPATH="$(dirname "${DEVPATH}")"
+	local tpes="$(input_gettype "/sys${DEVPATH}")"
+	for tpe in ${tpes}; do
+		case "${tpe}" in
+			keyboard|mouse|touchpad|tablet|tabletmode)
+				;;
+			touchscreen)
+				: > "/usr/local/var/touchscreen"
+				;;
+			joystick)
+				tpe="mouse"
+				;;
+			lid|sleep|power)
+				continue
+				;;
+			*)
+				warn "Unsupported type ${tpe} for ${DEVPATH}"
+				continue
+				;;
+		esac
+		local dev="$(get_devnum "${DEVPATH}")"
+		local maj="${dev%%:*}"
+		local min="${dev##*:}"
+
+		local prev="$(find_device "${X11_PATH}" "${maj}" "${min}")"
+		if [[ -n "${prev}" ]]; then
+			# Do not generate conflicts for e.g. eventN Vs keyboardM
+			if [[ "${prev/${base}/}" != "${prev}" ]]; then
+				warn "Device ${maj} - ${min} already present as ${prev}"
+			else
+				warn "Duplicate entry for ${maj} - ${min} : ${prev}"
+			fi
+			x11_notify -p "${X11_SOCKPATH}" -r -s "/sys${DEVPATH}" -d "<dummy>"
+		fi
+	
+		local new
+		new=$(create_device "${X11_PATH}" "${tpe}" "${maj}" "${min}")
+		[[ -n "${new}" ]] || return 1
+
+		rm -f "${new}-syspath"
+		ln -s "/sys${DEVPATH}" "${new}-syspath"
+
+		new="${new/${X11_PATH}/${ROOT_PATH}}"
+		
+		[[ -z "${INIT}" && -e "${X11_SOCKPATH}" ]] && info "Notifying X11 of new device: /sys${DEVPATH} / ${new}"
+		x11_notify -p "${X11_SOCKPATH}" -a -s "/sys${DEVPATH}" -d "${new}" -t "${tpe}"
+		user_notify "add" "${tpe}" "${idx}"
+	done
+
+}
+
+# Notify X11 of a removed input device then unlink the corresponding device node
+cleanup_device() {
+	local bn="$(basename "${DEVPATH}")"
+	[[ "${bn%input*}" == "${bn}" ]] && return 1
+	[[ -z "${INIT}" && -e "${X11_SOCKPATH}" ]] && info "Notifying X11 of removed device: /sys${DEVPATH}"
+	x11_notify -p "${X11_SOCKPATH}" -r -s "/sys${DEVPATH}" -d "<dummy>"
+	for l in "${ROOT_PATH}"/*-syspath "${X11_PATH}"/*-syspath; do
+		local lnk="$(readlink "${l}")"
+		if [[ "/sys${DEVPATH}" == "${lnk}" ]]; then
+			info "Removing device: ${l%-syspath}"
+			local tpe="$(echo "$l" | sed -r 's,.*/([a-z]+)[0-9]*-syspath,\1,')"
+			# TODO: handle the last touchscreen
+			#[[ "${tpe}" = "touchscreen" ]] && rm -f "/usr/local/var/touchscreen"
+			user_notify "remove" "${tpe}"
+			rm -f "${l}" "${l%-syspath}"
+		fi
+	done
+}
+
+exec 42>/var/run/hotplug-input
+
+case "$1" in
+	add)
+		flock -x -w 10 42 || exit 1
+		add_device
+		;;
+	remove)
+		flock -x 42 || exit 1
+		cleanup_device
+		;;
+	*)
+		warn "hotplug/input: unknown action ${1} : ${DEVPATH}"
+		;;
+esac

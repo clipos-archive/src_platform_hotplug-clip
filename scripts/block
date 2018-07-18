@@ -1,0 +1,79 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Block device attach / detach hotplug handler for CLIP
+# Copyright 2011 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+#
+# All rights reserved.
+
+export COMING_FROM_HOTPLUG=yes
+
+[[ -n "${DEVPATH}" && -n "${MAJOR}" && -n "${MINOR}" && -n "${DEVNAME}" ]] || exit 1
+
+
+[[ "${SUBSYSTEM}" == "block" ]] || exit 1
+case "${DEVTYPE}" in 
+	disk)
+		logger -p daemon.debug "hotplug/block: ${1} disk ${DEVNAME} (${MAJOR}:${MINOR})"
+		;;
+	partition)
+		logger -p daemon.debug "hotplug/block: ${1} partition ${DEVNAME} (${MAJOR}:${MINOR})"
+		;;
+	*)
+		logger -p daemon.warning "hotplug/block: unsupported block device type : ${DEVTYPE}"
+		;;
+esac
+
+add_block() {
+	if [[ ! -e "/dev/${DEVNAME}" ]]; then
+		if ! mknod "/dev/${DEVNAME}" b ${MAJOR} ${MINOR}; then
+			logger -p daemon.warning "hotplug/block: failed to create ${DEVNAME}"
+			return 1
+		else
+			logger -p daemon.debug "hotplug/block: created ${DEVNAME}"
+		fi
+	fi
+}
+
+remove_block() {
+	local -i ret=0
+	if [[ -e "/dev/${DEVNAME}" ]]; then
+		if ! rm "/dev/${DEVNAME}"; then
+			logger -p daemon.warning "hotplug/block: failed to remove ${DEVNAME}"
+			ret=1
+		else
+			logger -p daemon.debug "hotplug/block: removed ${DEVNAME}"
+		fi
+	else
+		logger -p daemon.warning "hotplug/block: missing device ${DEVNAME}"
+	fi
+
+	# N.B. add is called on scsi_device add
+	if [[ -x "/lib/hotplug.d/usb_storage" ]]; then
+		/lib/hotplug.d/usb_storage remove
+	fi
+
+	return $ret
+}
+
+
+RET=0
+case "${1}" in
+	add)
+		add_block || RET=1
+		;;
+	remove)
+		remove_block || RET=1
+		;;
+	*)
+		logger -p daemon.warning "hotplug/block: unknown action ${1} : ${DEVPATH}"
+		exit 1
+		;;
+esac
+
+if [[ "${DEVTYPE}" == "disk" && -x "/lib/hotplug.d/usb_storage" ]]; then
+	/lib/hotplug.d/usb_storage "${@}" # We don't relay errors from this to the caller
+fi
+
+exit $RET

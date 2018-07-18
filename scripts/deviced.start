@@ -1,0 +1,50 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Copyright 2010-2013 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# Distributed under the terms of the GNU General Public License v2
+
+[[ -f /etc/conf.d/power ]] && source /etc/conf.d/power
+
+CMDLINE="-N"
+RET=0
+
+if [[ "${SLEEP_CAPABLE}" == "yes" ]]; then
+	CMDLINE="${CMDLINE} -S /mounts/user_priv/var/run/suspend"
+	for d in "/dev/input/"lid*; do
+		[[ -c "${d}" ]] && CMDLINE="${CMDLINE} -l ${d}"
+	done
+	for d in "/dev/input/"power*; do
+		[[ -c "${d}" ]] && CMDLINE="${CMDLINE} -p ${d}"
+	done
+	for d in "/dev/input/"sleep*; do
+		[[ -c "${d}" ]] && CMDLINE="${CMDLINE} -s ${d}"
+	done
+	for d in "/dev/input/"toshiba* "/dev/input/"thinkpad* "/dev/input/"apple*; do
+		[[ -c "${d}" ]] && CMDLINE="${CMDLINE} -k ${d}"
+	done
+fi
+
+for d in "/dev/input/"tabletmode*; do
+	[[ -c "${d}" ]] && CMDLINE="${CMDLINE} -t ${d}"
+done
+if [[ -z "${CMDLINE}" ]]; then
+	echo "No input device found, eventd will not be launched"
+	exit 0
+fi
+
+if ! start-stop-daemon --start \
+		-x /sbin/eventd -- \
+		${CMDLINE}; then
+	echo "Failed to start eventd" >&2
+	RET=1
+fi
+
+if ! start-stop-daemon --start \
+		-x /sbin/device-admind -- \
+		-s "/mounts/admin_priv/var/run/deviced"; then
+	echo "Failed to start device-admind" >&2
+	RET=1
+fi
+# vim:ts=4

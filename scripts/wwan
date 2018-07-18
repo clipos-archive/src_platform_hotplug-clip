@@ -1,0 +1,78 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# 3G tty devices creation/removal init script for CLIP
+# Copyright 2011, 2013 SGDSN/ANSSI
+# Authors:
+#	Vincent Strubel <clipos@ssi.gouv.fr>
+#	Yves-Alexis Perez <clipos@ssi.gouv.fr>
+#
+# All rights reserved
+
+source /lib/clip/devices.sub || exit 1
+
+STATEDIR="/var/run"
+
+do_add() {
+	local devmount="/dev"
+	local devperms=0600
+	local devtype="3g"
+
+	make_device 'c' "/sys${DEVPATH}" ${devmount} ${devperms} "${DEVNAME}"
+	if [[ $? -eq 0 ]]; then
+		logger -p daemon.debug "hotplug/wwan: added ${DEVNAME}"
+		[[ "${DEVNAME#tty{HS,USB}}" == "0" ]] && clip-device-notify "add" ${devtype}
+		[[ -z "${DEVNAME#ttyACM?}" && "$((${DEVNAME#ttyACM} % 3))" == "0" ]] \
+			&& clip-device-notify "add" ${devtype}
+		echo ${devtype} > ${STATEDIR}/wwan.${DEVNAME}
+	else
+		logger -p daemon.warning "hotplug/wwan: failed to add ${DEVNAME}"
+	fi
+}
+
+do_remove() {
+	local devmount="/dev"
+	local devtype="3g"
+
+	[[ -e "${STATEDIR}/wwan.${DEVNAME}" ]] && devtype="$(<${STATEDIR}/wwan.${DEVNAME})"
+
+	if [[ ! -c "${devmount}/${DEVNAME}" ]]; then
+		logger -p daemon.warning "hotplug/wwan: missing ${DEVNAME}"
+		return 1
+	fi
+
+	if rm -f "${devmount}/${DEVNAME}"; then
+		logger -p daemon.debug "hotplug/wwan: removed ${DEVNAME}"
+		[[ "${DEVNAME#tty{HS,USB}}" == "0" ]] && clip-device-notify "remove" ${devtype}
+		[[ -z "${DEVNAME#ttyACM?}" && "$((${DEVNAME#ttyACM} % 3))" == "0" ]] \
+			&& clip-device-notify "remove" ${devtype}
+		rm -f "${STATEDIR}/wwan.${DEVNAME}"
+	else
+		logger -p daemon.warning "hotplug/wwan: failed to remove ${DEVNAME}"
+	fi
+}
+
+if [[ -z "${DEVNAME}" || -z "${DEVPATH}" ]]; then
+	logger -p daemon.warning "hotplug/wwan: missing DEVNAME / DEVPATH"
+	exit 1
+fi
+
+# Check tty substrings
+if [[ "${DEVNAME#tty{HS,USB,ACM}}" == "${DEVNAME}" ]]; then
+	logger -p daemon.warning "hotplug/wwan: unsupported DEVNAME ${DEVNAME} / DEVPATH ${DEVPATH}"
+	exit 1
+fi
+
+case "${1}" in
+	add)
+		do_add
+		;;
+	remove)
+		do_remove
+		;;
+	*)
+		logger -p daemon.warning "hotplug/wwan: unknown action ${1}"
+		exit 1
+		;;
+esac
+

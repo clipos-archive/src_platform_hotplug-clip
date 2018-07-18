@@ -1,0 +1,93 @@
+################# configure part ##############################
+
+
+CC = @CC@
+srcdir = @srcdir@
+SHELL = @SHELL@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@ 
+PREFIX = @prefix@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+debug = @debug@
+
+CFLAGS += -DVERSION=${VERSION} -DSBINDIR=\"${sbindir}\" -DBINDIR=\"${bindir}\"
+IFLAGS += -I ../common
+
+INPUT_SRC := inputattach.c
+INPUT := inputattach
+INPUT_LDADD := 
+
+BIN_SCRIPTS :=
+SBIN_SCRIPTS := 
+
+BIN_BINARIES :=
+SBIN_BINARIES := ${INPUT}
+
+BINARIES := ${SBIN_BINARIES} ${BIN_BINARIES}
+BIN_EXES := ${BIN_BINARIES} ${BIN_SCRIPTS}
+SBIN_EXES := ${SBIN_BINARIES} ${SBIN_SCRIPTS}
+
+.PHONY: all 
+
+all: build
+
+###############################################################
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+OBJS_DIR ?= obj
+INPUT_OBJFILES := ${foreach file, ${patsubst %.c,%.o,${INPUT_SRC}}, ${OBJS_DIR}/${file}}
+
+DEPS_DIR = ${OBJS_DIR}/.deps
+INPUT_DEPFILES := ${foreach file, ${basename ${INPUT_SRC}}, ${DEPS_DIR}/${file}.d}
+
+OBJFILES := ${INPUT_OBJFILES} 
+DEPFILES := ${INPUT_DEPFILES}
+
+
+###############################################################
+.PHONY: build clean mrproper maintainer-clean
+
+${OBJS_DIR}:
+	mkdir -p ${OBJS_DIR}
+
+${DEPS_DIR}:
+	mkdir -p ${DEPS_DIR}
+
+${OBJS_DIR}/%.o:%.c Makefile
+	@${ECHO} "        CC                $<"
+	$(CC) $(CFLAGS) $(IFLAGS) -MT $@ -MD -MP -MF ${DEPS_DIR}/$*.d -c -o $@ $<
+
+${INPUT}: ${INPUT_OBJFILES} 
+	@${ECHO} "        LD                $@"
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ${INPUT_LDADD}
+
+build: ${OBJS_DIR} ${DEPS_DIR} ${BINARIES}
+
+install: build
+	list='$(SBIN_EXES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${sbindir}/$$exe" ;\
+		install -D $$exe ${DESTDIR}${sbindir}/$$exe ;\
+	done
+	list='$(BIN_EXES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${bindir}/$$exe" ;\
+		install -D $$exe ${DESTDIR}${bindir}/$$exe ;\
+	done
+
+clean:
+	@${ECHO} "        CLEAN             ${BINARIES} ${OBJFILES}"
+	rm -f ${BINARIES} ${OBJFILES} ${DEPFILES} 
+
+mrproper: clean
+	rmdir ${DEPS_DIR} ${OBJS_DIR}
+	rm -f Makefile
+
+
+-include ${DEPFILES}

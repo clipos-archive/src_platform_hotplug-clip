@@ -1,0 +1,28 @@
+prefix = @prefix@
+datadir = @datadir@
+datarootdir = @datarootdir@
+
+IMG_FILES := input-keyboard.png input-mouse.png network-wireless.png printer.png smartcard.png scanner.png
+
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+all:
+
+build:
+
+clean:
+
+mrproper:
+	rm Makefile
+
+install: 
+	list='$(IMG_FILES)'; for img in $$list; do \
+		${ECHO} "        install -m 0644 -D $$img ${DESTDIR}${datadir}/hotplug/img/$$img" ;\
+		install -m 0644 -D $$img ${DESTDIR}${datadir}/hotplug/img/$$img ;\
+	done
+

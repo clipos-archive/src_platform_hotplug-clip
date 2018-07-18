@@ -1,0 +1,70 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Switch sound context
+# Copyright 2013-2014 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+#
+# All rights reserved.
+
+source /lib/clip/misc.sub
+
+LOGPREF="switch-sound-context"
+STATEDIR="/var/lib/alsa"
+
+warning() {
+	logger -p daemon.warning "${LOGPREF}: ${1}"
+}
+
+error() {
+	warning "${1}"
+	exit 1
+}
+
+info() {
+	logger -p daemon.info "${LOGPREF}: ${1}"
+}
+
+
+JAIL="${1}"
+CTX="0"
+CAPTURE_MODE="600"
+
+[[ -n "${JAIL}" ]] || error "missing jail name"
+
+source /etc/conf.d/clip
+
+if grep -q '^SOUND_CAPTURE=yes' "/etc/admin/conf.d/devices"; then
+	CAPTURE_MODE="660"
+fi
+
+if [[ "${JAIL}" != "none" ]]; then
+	[[ -e "/etc/jails/${JAIL}/context" ]] \
+		|| error "invalid jail name : ${JAIL}"
+	CTX="$(<"/etc/jails/${JAIL}/context")"
+fi
+
+for jail in ${CLIP_JAILS}; do
+	devs="/mounts/vsdev/${jail}/user_devs/snd"
+	if [[ "${jail}" == "${JAIL}" ]]; then
+		chmod 750 "${devs}"
+		chmod 660 "${devs}"/{control*,pcm*p,timer}
+		chmod ${CAPTURE_MODE} "${devs}"/pcm*c
+	else
+		chmod 700 "${devs}"
+		chmod 600 "${devs}"/*
+	fi
+done
+
+sysctl kernel.clip.sound_xid="${CTX}" \
+	|| error "failed to write sound_xid (jail: ${JAIL}, xid: ${CTX})"
+echo "${JAIL}" > "${STATEDIR}/soundcard.jail"
+
+info "switched sound to jail ${JAIL} (xid: ${CTX})"
+
+CURRENT_UID="$(current_uid)"
+[[ -n "${CURRENT_UID}" ]] || exit 0
+
+for jail in ${CLIP_JAILS}; do
+	vsctl ${jail} enter -c /user -u ${CURRENT_UID} -i /dev/null -o /dev/null -d -- /bin/pkill pulseaudio
+done

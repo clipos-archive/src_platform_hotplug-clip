@@ -1,0 +1,50 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Copyright 2014 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved
+
+# Set ownership and permissions for all files in a target
+# directory and all absolute path components leading to it,
+# except /sys itself.
+set_path_perms() {
+	local symlink="${1}" 	# target directory
+	local owner="${2}"	# owner
+	local fmod="${3}"	# permissions for regular files
+	local dmod="${4}"	# permissions for path components
+
+	local target="$(readlink -f "${symlink}")"
+
+	[[ -n "${target}" ]] || return 1
+	
+	for f in "${target}"/*; do
+		[[ -f "${f}" ]] || continue
+		chown "${owner}" "${f}" || return 1
+		chmod "${fmod}" "${f}" || return 1
+	done
+
+	while [[ "${target}" != "/sys" ]]; do
+		chown "${owner}" "${target}" || return 1
+		chmod "${dmod}" "${target}" || return 1
+		target="${target%/*}"
+	done
+}
+
+# Make battery/AC sysfs directories and files readable
+# by the admin group
+set_power_supply_perms() {
+	[[ -e /sys/class/power_supply ]] || return 0
+
+	chgrp admin /sys/class || return 1
+	chgrp admin /sys/class/power_supply || return 1
+	chmod 750 /sys/class || return 1
+	chmod 750 /sys/class/power_supply || return 1
+
+	for dir in /sys/class/power_supply/*; do
+		[[ -e "${dir}" ]] || continue
+		set_path_perms "${dir}" "root:admin" "0640" "0750"  || return 1
+	done
+}
+
+set_power_supply_perms

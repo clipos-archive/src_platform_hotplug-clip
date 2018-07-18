@@ -1,0 +1,202 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# CLIP script to handle 'function keys' not handled by kernel
+# Copyright 2012 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved.
+
+TYPE="${1}"
+ACTION="${2}"
+
+[[ -n "${ACTION}" ]] || exit 1
+
+
+get_user() {
+	CUR_USER="$(last -w -f /var/run/utmp | awk '$2 ~ /^:0/ { print $1 }' | head -n 1)"
+	if [[ -n "${CUR_USER}" ]]; then
+		CUR_UID=$(id -u ${CUR_USER})
+		[[ -n "${CUR_UID}" ]] || exit 1
+	fi
+}
+
+handle_sound() {
+	local action="${1}"
+
+	local -i level=$(amixer sget Master | grep 'dB' | sed -e 's/.*\[\([0-9]\+\)%\].*/\1/'|tail -n 1)
+
+	if [[ "${action}" == "mute" ]]; then
+		amixer sset Master toggle 1>/dev/null
+		exit $?
+	fi
+
+	if [[ "${action}" == "up" ]]; then
+		level=$(( ${level} + 10 ))
+	elif [[ "${action}" == "down" ]]; then
+		level=$(( ${level} - 10 ))
+	else
+		echo "Unhandled action ${action}"
+		exit 0
+	fi
+
+	[[ ${level} -gt 100 ]] && level=100
+	[[ ${level} -lt 0 ]] && level=0
+
+	amixer sset Master "${level}%" 1>/dev/null
+}
+
+ACPI_BACKLIGHT="/sys/class/backlight/acpi_video0"
+handle_acpi_brightness() {
+	local action="${1}"
+
+	local -i current="$(<"${ACPI_BACKLIGHT}/brightness")"
+	if [[ "${action}" == "up" ]]; then
+		current=$(( ${current} + 1 ))
+	elif [[ "${action}" == "down" ]]; then
+		[[ ${current} -eq 0 ]] || current=$(( ${current} - 1 ))
+	else
+		exit 1
+	fi
+		
+	echo "${current}" > "${ACPI_BACKLIGHT}/brightness"
+}
+
+INTEL_BACKLIGHT="/sys/class/backlight/intel_backlight"
+handle_intel_brightness() {
+	local action="${1}"
+
+	local -i current="$(<"${INTEL_BACKLIGHT}/brightness")"
+	local -i max="$(<"${INTEL_BACKLIGHT}/max_brightness")"
+	local -i increment=$(( ${max} / 10 ))
+	if [[ "${action}" == "up" ]]; then
+		current=$(( ${current} + ${increment} ))
+		[[ ${current} -gt ${max} ]] && current=${max}
+	elif [[ "${action}" == "down" ]]; then
+		current=$(( ${current} - ${increment} ))
+		[[ ${current} -lt 0 ]] && current=0
+	else
+		exit 1
+	fi
+		
+	echo "${current}" > "${INTEL_BACKLIGHT}/brightness"
+}
+
+NVIDIA_BACKLIGHT="/sys/class/backlight/nv_backlight"
+handle_nvidia_brightness() {
+	local action="${1}"
+
+	local -i current="$(<"${NVIDIA_BACKLIGHT}/brightness")"
+	local -i max="$(<"${NVIDIA_BACKLIGHT}/max_brightness")"
+	local -i increment=$(( ${max} / 10 ))
+	if [[ "${action}" == "up" ]]; then
+		current=$(( ${current} + ${increment} ))
+		[[ ${current} -gt ${max} ]] && current=${max}
+	elif [[ "${action}" == "down" ]]; then
+		current=$(( ${current} - ${increment} ))
+		[[ ${current} -lt 0 ]] && current=0
+	else
+		exit 1
+	fi
+		
+	echo "${current}" > "${NVIDIA_BACKLIGHT}/brightness"
+}
+
+APPLE_BACKLIGHT="/sys/class/backlight/apple_backlight"
+handle_apple_brightness() {
+	local action="${1}"
+
+	local -i current="$(<"${APPLE_BACKLIGHT}/brightness")"
+	local -i max="$(<"${APPLE_BACKLIGHT}/max_brightness")"
+	local -i increment=$(( ${max} / 10 ))
+	if [[ "${action}" == "up" ]]; then
+		current=$(( ${current} + ${increment} ))
+		[[ ${current} -gt ${max} ]] && current=${max}
+	elif [[ "${action}" == "down" ]]; then
+		current=$(( ${current} - ${increment} ))
+		[[ ${current} -lt 0 ]] && current=0
+	else
+		exit 1
+	fi
+		
+	echo "${current}" > "${APPLE_BACKLIGHT}/brightness"
+}
+
+handle_brightness() {
+	local action="${1}"
+
+	if [[ -e "${INTEL_BACKLIGHT}" ]]; then
+		handle_intel_brightness "${action}"
+	elif [[ -e "${ACPI_BACKLIGHT}" ]]; then
+		handle_acpi_brightness "${action}"
+	elif [[ -e "${NVIDIA_BACKLIGHT}" ]]; then
+		handle_nvidia_brightness "${action}"
+	elif [[ -e "${APPLE_BACKLIGHT}" ]]; then
+		handle_apple_brightness "${action}"
+	else
+		echo "Panel backlight is not handled" >&2
+	fi
+}
+
+APPLE_KEYBOARD_LED="/sys/class/leds/smc::kbd_backlight"
+handle_apple_keyboard_led() {
+	local action="${1}"
+
+	local -i current="$(<"${APPLE_KEYBOARD_LED}/brightness")"
+	local -i max="$(<"${APPLE_KEYBOARD_LED}/max_brightness")"
+	local -i increment=$(( ${max} / 10 ))
+	if [[ "${action}" == "up" ]]; then
+		current=$(( ${current} + ${increment} ))
+		[[ ${current} -gt ${max} ]] && current=${max}
+	elif [[ "${action}" == "down" ]]; then
+		current=$(( ${current} - ${increment} ))
+		[[ ${current} -lt 0 ]] && current=0
+	else
+		exit 1
+	fi
+		
+	echo "${current}" > "${APPLE_KEYBOARD_LED}/brightness"
+}
+
+handle_keyboard_led() {
+	local action="${1}"
+
+	if [[ -e "${APPLE_KEYBOARD_LED}" ]]; then
+		handle_apple_keyboard_led "${action}"
+	else
+		echo "Keyboard led is not handled" >&2
+	fi
+}
+
+handle_screenlock() {
+	get_user
+
+	vsctl user enter -u "${CUR_UID}" -- \
+		/usr/bin/clip-suspend-xlock
+}
+	
+case "${TYPE}" in 
+	sound)
+		handle_sound "${ACTION}"
+		;;
+	brightness)
+		handle_brightness "${ACTION}"
+		;;
+	screenlock)
+		handle_screenlock 
+		;;
+	led)
+		handle_keyboard_led "${ACTION}"
+		;;
+	eject)
+		eject
+		;;
+	wifi|video)
+		echo "${TYPE} actions not handled yet" >&2
+		exit 0
+		;;
+	*)
+		echo "Unknown action type : ${TYPE}" >&2
+		exit 1
+		;;
+esac
+

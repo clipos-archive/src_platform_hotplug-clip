@@ -1,0 +1,21 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Copyright 2010 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved.
+
+export DISPLAY=:0
+export XAUTHORITY=/home/user/.Xauthority
+
+/usr/local/bin/xscreensaver-command -time | grep -q locked && exit 0
+
+/usr/local/bin/xscreensaver-command -lock
+
+for i in {1..5}; do
+	/usr/local/bin/xscreensaver-command -time | grep -q locked && exit 0
+	sleep 0.5
+done
+
+# lock cancelled
+exit 1

@@ -1,0 +1,46 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Net interface creation / removal hotplug handler for CLIP
+# Copyright 2011 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+#
+# All rights reserved.
+
+ACTION="${1}"
+INTERFACE="${2}"
+
+[[ -n "${INTERFACE}" ]] || exit 1
+
+source /etc/conf.d/net
+
+[[ -n "${ADMIN_IF}" ]] || exit 0
+
+case "${ACTION}" in 
+	add)
+		MSG_OK="added"
+		;;
+	remove)
+		MSG_OK="deleted"
+		;;
+	*)
+		logger -p daemon.warning "hotplug/net: unsupported action ${ACTION}"
+		;;
+esac
+
+if [[ "${INTERFACE}" == "eth${ADMIN_IF}" ]]; then
+	logger -p daemon.debug "hotplug/net: admin interface ${INTERFACE} - ${ACTION}"
+	if [[ "${ACTION}" == "add" ]]; then
+		ip link set up dev "${INTERFACE}" \
+			|| logger -p daemon.warning "hotplug/net: failed to activate ${INTERFACE}"
+	fi
+	
+	if netd-client -s "/var/run/netd" ; then
+		logger -p daemon.info "hotplug/net: ${MSG_OK} admin interface ${INTERFACE}"
+	else
+		logger -p daemon.warning "hotplug/net: failed to ${ACTION} admin interface ${INTERFACE}"
+	fi
+else
+	logger -p daemon.info "hotplug/net: interface ${INTERFACE} ${MSG_OK} - no action performed"
+fi
+

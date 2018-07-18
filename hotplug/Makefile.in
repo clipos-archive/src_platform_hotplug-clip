@@ -1,0 +1,106 @@
+################# configure part ##############################
+
+
+CC = @CC@
+srcdir = @srcdir@
+SHELL = @SHELL@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@ 
+PREFIX = @prefix@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+debug = @debug@
+
+CFLAGS += -DVERSION=${VERSION} -DSBINDIR=\"${sbindir}\" -DBINDIR=\"${bindir}\"
+IFLAGS += -I ../common
+
+HOTPLUG_SRC := block.c usb.c firmware.c hotplug.c wwan.c net.c printer.c input.c video.c screen.c
+ifeq ($(debug), yes)
+HOTPLUG_SRC += log.c
+endif
+HOTPLUG := hotplug
+HOTPLUG_LDADD := ../common/obj/common.o
+
+HOTPLUG_INITRD_SRC := firmware.c hotplug_initrd.c
+HOTPLUG_INITRD := hotplug.initrd
+HOTPLUG_INITRD_LDADD := ../common/obj/common.o -static
+
+BIN_SCRIPTS :=
+SBIN_SCRIPTS := 
+
+BIN_BINARIES :=
+SBIN_BINARIES := ${HOTPLUG} ${HOTPLUG_INITRD}
+
+BINARIES := ${SBIN_BINARIES} ${BIN_BINARIES}
+BIN_EXES := ${BIN_BINARIES} ${BIN_SCRIPTS}
+SBIN_EXES := ${SBIN_BINARIES} ${SBIN_SCRIPTS}
+
+.PHONY: all 
+
+all: build
+
+###############################################################
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+OBJS_DIR ?= obj
+HOTPLUG_OBJFILES := ${foreach file, ${patsubst %.c,%.o,${HOTPLUG_SRC}}, ${OBJS_DIR}/${file}}
+HOTPLUG_INITRD_OBJFILES := ${foreach file, ${patsubst %.c,%.o,${HOTPLUG_INITRD_SRC}}, ${OBJS_DIR}/${file}}
+
+DEPS_DIR = ${OBJS_DIR}/.deps
+HOTPLUG_DEPFILES := ${foreach file, ${basename ${HOTPLUG_SRC}}, ${DEPS_DIR}/${file}.d}
+HOTPLUG_INITRD_DEPFILES := ${foreach file, ${basename ${HOTPLUG_INITRD_SRC}}, ${DEPS_DIR}/${file}.d}
+
+OBJFILES := ${HOTPLUG_OBJFILES} ${HOTPLUG_INITRD_OBJFILES}
+DEPFILES := ${HOTPLUG_DEPFILES} ${HOTPLUG_INITRD_DEPFILES}
+
+
+###############################################################
+.PHONY: build clean mrproper maintainer-clean
+
+${OBJS_DIR}:
+	mkdir -p ${OBJS_DIR}
+
+${DEPS_DIR}:
+	mkdir -p ${DEPS_DIR}
+
+${OBJS_DIR}/%.o:%.c Makefile
+	@${ECHO} "        CC                $<"
+	$(CC) $(CFLAGS) $(IFLAGS) -MT $@ -MD -MP -MF ${DEPS_DIR}/$*.d -c -o $@ $<
+
+${HOTPLUG}: ${HOTPLUG_OBJFILES} 
+	@${ECHO} "        LD                $@"
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ${HOTPLUG_LDADD}
+
+${HOTPLUG_INITRD}: ${HOTPLUG_INITRD_OBJFILES} 
+	@${ECHO} "        LD                $@"
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) ${HOTPLUG_INITRD_LDADD}
+
+build: ${OBJS_DIR} ${DEPS_DIR} ${BINARIES}
+
+install: build
+	list='$(SBIN_EXES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${sbindir}/$$exe" ;\
+		install -D $$exe ${DESTDIR}${sbindir}/$$exe ;\
+	done
+	list='$(BIN_EXES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${bindir}/$$exe" ;\
+		install -D $$exe ${DESTDIR}${bindir}/$$exe ;\
+	done
+
+clean:
+	@${ECHO} "        CLEAN             ${BINARIES} ${OBJFILES}"
+	rm -f ${BINARIES} ${OBJFILES} ${DEPFILES} 
+
+mrproper: clean
+	rmdir ${DEPS_DIR} ${OBJS_DIR}
+	rm -f Makefile
+
+
+-include ${DEPFILES}

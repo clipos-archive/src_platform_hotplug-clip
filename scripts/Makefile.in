@@ -1,0 +1,54 @@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sbindir = @sbindir@
+libdir = @libdir@
+sysconfdir = @sysconfdir@
+
+INIT_FILES := mkdevices 
+LOCAL_FILES := deviced.start deviced.stop
+HOTPLUG_FILES := block input usb wwan net screen
+SUB_FILES := devices.sub scanner_devices.sub
+
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+all:
+
+build:
+
+clean:
+
+mrproper:
+	rm Makefile
+
+install: install_init install_local install_hotplug install_sub
+
+install_init:
+	list='$(INIT_FILES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${sysconfdir}/init.d/$$exe" ;\
+		install -D $$exe -m 0700 ${DESTDIR}${sysconfdir}/init.d/$$exe ;\
+	done
+
+install_local:
+	list='$(LOCAL_FILES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${sysconfdir}/local.d/$$exe" ;\
+		install -D $$exe -m 0700 ${DESTDIR}${sysconfdir}/local.d/$$exe ;\
+	done
+
+
+install_hotplug:
+	list='$(HOTPLUG_FILES)'; for exe in $$list; do \
+		${ECHO} "        install -D $$exe ${DESTDIR}${libdir}/hotplug.d/$$exe" ;\
+		install -D $$exe -m 0700 ${DESTDIR}${libdir}/hotplug.d/$$exe ;\
+	done
+
+install_sub:
+	list='$(SUB_FILES)'; for sub in $$list; do \
+		${ECHO} "        install -D $$sub ${DESTDIR}${libdir}/clip/$$sub" ;\
+		install -D $$sub -m 0644 ${DESTDIR}${libdir}/clip/$$sub ;\
+	done

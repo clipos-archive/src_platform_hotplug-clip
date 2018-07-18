@@ -1,0 +1,35 @@
+VERSION=2.6.1
+PACKAGE=hotplug-clip
+
+export VERSION
+export PACKAGE
+
+ifndef VERBOSE
+MAKEFLAGS += -s --no-print-directory
+ECHO = echo
+else 
+ECHO = echo > /dev/null
+endif
+
+SUBDIRS := common \
+	device-admind \
+	eventd \
+	hotplug \
+	input-attach \
+	input-gettype \
+	input-notifier \
+	scripts \
+	img
+
+TARGETS := build install clean mrproper 
+
+$(TARGETS) :
+	list='$(SUBDIRS)'; for subdir in $$list; do \
+		${ECHO} "        MAKE              $$subdir $@"; \
+		(cd $$subdir && $(MAKE) $@) \
+		|| exit 1; \
+	done
+
+maintainer-clean: mrproper
+	rm -fr autom4te.cache Makefile config.log config.status
+

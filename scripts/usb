@@ -1,0 +1,175 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# USB device creation / removal hotplug handler for CLIP
+# Copyright 2010-2011 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# Author: Benjamin Morin <clipos@ssi.gouv.fr>
+# Author: Yves-Alexis Perez <clipos@ssi.gouv.fr>
+#
+# All rights reserved.
+
+[[ -z "${DEVPATH}" ]] && exit 1
+
+# 076b = Omnikey
+# 08e6 = Gemalto
+# 096e = Feitian
+# 0a5c = Broadcom
+# 413c = Dell
+# 12d1 = Huawei
+# 058f = (?? -> lecteur navigo)
+# 0b97 = O2 (Toshiba R930)
+SCARD_VENDORS="076b 08e6 096e 0a5c 058f 0b97 0f14"
+ZEROCD_PRODUCTS="0af0"
+MODESWITCH_VENDORS="12d1"
+declare -A MODESWITCH_PRODUCTS[12d1]="14b7"
+
+SCANNER_DEVICES="/lib/clip/scanner_devices.sub"
+
+source "/lib/clip/usb_storage.sub"
+
+update_touchpad() {
+        CURRENT_USER_LOC="$(current_user)"
+	if [[ -e "/usr/local/bin/xsynaptics-settings.sh" ]]; then
+	        if [[ -n "${CURRENT_USER_LOC}" ]]; then
+        	       [[ -n "${CURRENT_UID}" ]] || get_connected_user
+	               if [[ -n "${CURRENT_UID}" ]]; then
+        	            ${USER_ENTER} -u "${CURRENT_UID}" -- /usr/local/bin/xsynaptics-settings.sh "${AUTHORITY}" "init"
+	               fi
+	       fi
+	fi
+       	return 0
+}
+
+add_usb() {
+	local -i ret=0
+	if [[ -z "${MAJOR}" ]]; then
+		local dev="$(cat "/sys/${DEVPATH}/dev")"
+		MINOR="${dev#*:}"
+		MAJOR="${dev%:*}"
+	fi
+	[[ "${MAJOR}" == "189" ]] || exit 1
+	local busnum=$(< "/sys/${DEVPATH}/busnum")
+	local devnum=$(<"/sys/${DEVPATH}/devnum")
+	busnum="$(printf "%03d" "${busnum}")"
+	devnum="$(printf "%03d" "${devnum}")"
+
+
+	[[ -n "${busnum}" ]] || exit 1
+	[[ -n "${devnum}" ]] || exit 1
+
+	logger -p daemon.debug "hotplug/usb: adding ${MAJOR}:${MINOR} as ${busnum}:${devnum}"
+	mkdir -p /dev/bus/usb/${busnum}/
+	mknod -m 0660 /dev/bus/usb/${busnum}/${devnum} c ${MAJOR} ${MINOR} || ret=1
+	chmod 640 /dev/bus/usb/${busnum}/${devnum} || ret=1
+
+	if [[ -e "/sys/${DEVPATH}/idVendor" ]]; then
+		VENDOR="$(<"/sys/${DEVPATH}/idVendor")"
+		PRODUCT="$(<"/sys/${DEVPATH}/idProduct")"
+
+		local v
+		for v in ${SCARD_VENDORS}; do
+			if [[ "${v}" == "${VENDOR}" ]]; then
+				logger -p daemon.debug "hotplug/usb: ${busnum}:${devnum} is a smartcard reader"
+				clip-device-notify "add" "scardreader"
+				[[ -f "/var/run/pcscd/pcscd.pid" ]] && /usr/sbin/pcscd -X $(</etc/jails/pcsc/context) --hotplug
+			fi
+		done
+
+		if [[ -e "${SCANNER_DEVICES}" ]]; then
+			while read USB_VENDOR USB_PRODUCT USB_MODEL ; do
+				[[ "${USB_VENDOR}" == "##" ]] && continue
+				[[ -z "${USB_VENDOR}" ]] && continue
+				if [[ "${USB_VENDOR}" == "0x${VENDOR}" && "${USB_PRODUCT}" == "0x${PRODUCT}" ]]; then
+					logger -p daemon.debug "hotplug/usb: ${busnum}:${devnum} is a scanner"
+					/lib/hotplug.d/scanner "add" || ret=1
+					ln -s "/dev/bus/usb/${busnum}/${devnum}" "/dev/scanner"
+					break
+				fi
+			done < "${SCANNER_DEVICES}"
+		fi
+
+		for v in ${MODESWITCH_VENDORS}; do
+			if [[ "${v}" == "${VENDOR}" ]]; then
+				local p
+				for p in ${MODESWITCH_PRODUCTS[${v}]}; do
+					if [[ "${p}" == "${PRODUCT}" ]]; then
+						logger -p daemon.debug "hotplug/usb: ${busnum}/${devnum} (${VENDOR}:${PRODUCT}) is a modeswitch device"
+						if [[ -x /usr/sbin/usb_modeswitch ]]; then
+							usb_modeswitch -I -W -s 20 -v "${VENDOR}" -p "${PRODUCT}" \
+								-c "/usr/share/usb_modeswitch/${VENDOR}:${PRODUCT}"
+							exit $?
+						fi
+					fi
+				done
+			fi
+		done
+	fi
+
+	if [[ -n "${VENDOR}" ]]; then
+		for p in ${ZEROCD_PRODUCTS}; do
+			if [[ "${p}" == "${VENDOR}" ]]; then
+				logger -p daemon.debug "hotplug/usb: ${busnum}:${devnum} is a zerocd device"
+				export VENDOR PRODUCT
+				zerocdoff.sh || ret=1
+			fi
+		done
+	fi
+
+	return $ret
+}
+
+match_remove_usb() {
+	local dev="${1}"
+	[[ "${MAJOR}" == "189" ]] || exit 1
+
+	local -a props=( $(ls -Ll "${dev}") )
+	local perms="${props[0]}"
+	local maj="${props[4]}"
+	maj="${maj%,}"
+	local min="${props[5]}"
+
+
+	if [[ "${maj}" == "${MAJOR}" && "${min}" == "${MINOR}" ]]; then
+		logger -p daemon.debug "hotplug/usb: removing ${dev} (${maj}:${min})"
+		rm -f "${dev}" || return 1
+		[[ -f "/var/run/pcscd/pcscd.pid" ]] && pcscd -X $(</etc/jails/pcsc/context) --hotplug
+		local scanner="$(readlink /dev/scanner)"
+		logger -p daemon.debug "scanner : ${scanner} vs dev: ${dev}."
+		if [[ -L "/dev/scanner" && "${scanner}" == "${dev}" ]]; then
+			logger -p daemon.debug "hotplug/usb: ${dev} is a scanner"
+			rm "/dev/scanner" 
+			/lib/hotplug.d/scanner "remove" 
+		fi
+		return 0
+	fi
+
+	return 1
+}
+
+remove_usb() {
+	local dev
+	for dev in $(find "/dev/bus/usb" -type c); do
+		match_remove_usb "${dev}" && return 0
+	done
+
+	return 0
+}
+
+case "${1}" in
+	add)
+		add_usb
+		;;
+	remove)
+		remove_usb
+		;;
+	*)
+		logger -p daemon.warning "hotplug/usb: unknown action ${1} : ${DEVPATH}"
+		exit 1
+		;;
+esac
+
+# -----------------------------
+# met a jour l etat du touchpad
+update_touchpad
+

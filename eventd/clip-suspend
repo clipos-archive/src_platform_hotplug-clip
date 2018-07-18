@@ -1,0 +1,172 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# Copyright © 2009-2018 ANSSI. All Rights Reserved.
+# Copyright 2010-2014 SGDSN/ANSSI
+# Author: Vincent Strubel <clipos@ssi.gouv.fr>
+# All rights reserved
+
+source "/lib/clip/devices.sub"
+source "/etc/conf.d/clip"
+
+X11_DEVPATH="/x11/dev/"
+X11_SOCKPATH="/mounts/x11_priv/var/run/inputdev"
+INPUT_LIST="/var/run/input.list"
+
+# Cleanup leftover devices on resume (e.g. USB mouse that was unplugged after suspending)
+cleanup_devices() {
+	for dev in $(find "/dev/bus/usb" -type c); do
+		remove_leftover_device "${dev}" \
+			&& logger -p daemon.info "suspend/usb: removed ${dev}"
+	done
+	if [[ -e "${X11_SOCKPATH}" ]]; then
+		for dev in "${X11_DEVPATH}/input/"{mouse,touchpad,keyboard,touchscreen,tablet}[0-9]; do
+			local spath="$(readlink "${dev}-syspath")"
+			[[ -n "${spath}" ]] || continue
+			if [[ ! -e "${spath}" ]]; then
+				rm -f "${dev}" "${dev}-syspath"
+				clip-input-notify -p "${X11_SOCKPATH}" -r -s "${spath}" -d "<dummy>"
+				logger -p daemon.info "suspend/input: removed ${dev}"
+			fi
+		done
+	fi
+}
+
+xrandr_get_status() {
+	XAUTHORITY="/var/run/authdir/slim.auth" DISPLAY=":0" xrandr --current 2>&1
+}
+
+if [[ -n "$CLIP_NO_X11" ]]; then
+	# No X11, so we don't even try to suspend, we go straight to poweroff
+	logger -p daemon.info "suspend/power: shutting down the box"
+	poweroff
+fi
+
+CURRENT_USER="$(last -w -f /var/run/utmp | awk '$2 ~ /^:0/ { print $1 }' | head -n 1)"
+if [[ -n "${CURRENT_USER}" ]]; then
+	CURRENT_UID=$(id -u ${CURRENT_USER})
+fi
+
+if [[ -n "${CURRENT_UID}" ]]; then
+	if vsctl user enter -u "${CURRENT_UID}" -- /bin/true; then
+		# If there is a USER session active, make sure we lock it
+		# before suspending
+		# Switch to X11 VT to make sure the screen is properly blanked
+		chvt 7
+		# Lock session, stop here if screen lock is cancelled
+		vsctl user enter -u "${CURRENT_UID}" -- /usr/bin/clip-suspend-xlock || exit 0
+	fi
+fi
+
+# Kill console sessions, just in case (I know I need it :)
+killall login 2>/dev/null
+
+# Log to syslog
+export CLIP_RC_SYSLOG="yes"
+# Properly log off from the network
+/etc/init.d/netconf stop
+
+# Don't suspend during startup, reboot or shutdown
+# We test this as late as possible, since xdm does
+# not stop immediately when a reboot is requested.
+if /etc/init.d/xdm status | grep -qw started; then
+	runlevel="$(runlevel | cut -d" " -f2)"
+	case "${runlevel}" in
+		3|4|5)
+			;;
+		*)
+			exit 0
+	esac
+else
+	exit 0
+fi
+
+# Save input device list, so as to be able to
+# add any new devices on resume
+rm -f "${INPUT_LIST}"
+for d in "/sys/class/input/input"*; do
+	echo "${d}" >> "${INPUT_LIST}"
+done
+
+# Save brightness to try to restore it on resume
+BRIGHTNESS_FILE="/sys/class/backlight/acpi_video0/brightness"
+declare -i BRIGHTNESS
+if [[ -f "${BRIGHTNESS_FILE}" ]]; then
+	BRIGHTNESS="$(<"${BRIGHTNESS_FILE}")"
+else
+	BRIGHTNESS=0
+fi
+
+XRANDR_STATUS="$(xrandr_get_status)"
+
+# Just in case...
+sync
+
+echo 'mem' > /sys/power/state
+
+### On resume ###
+
+# Try to restore brightness
+if [[ ${BRIGHTNESS} -gt 0 ]]; then
+	echo "${BRIGHTNESS}" > "${BRIGHTNESS_FILE}"
+fi
+
+cleanup_devices
+
+# Needed on DELL laptops, otherwise keyboard is not functional on resume
+# However, this seems to break bad on certain Lenovo laptops.
+if grep -q "DELL_Latitude" "/etc/core/machine"; then
+	if [[ -e "/sys/devices/platform/i8042" ]]; then
+		for d in "/sys/devices/platform/i8042"/serio*; do
+			echo -n 'reconnect' > "${d}/drvctl"
+		done
+	fi
+fi
+
+# Add new input devices
+for d in "/sys/class/input/input"*; do
+	grep -q "${d}" "${INPUT_LIST}" && continue
+
+	DEVPATH="$(ls -1d "${d}/event"* | head -n 1)"
+	export DEVPATH="${DEVPATH#/sys}"
+	logger -p daemon.info "suspend/input: adding new input device: ${d}"
+	/lib/hotplug.d/input add
+done
+
+# Fix sysfs permissions
+clip-sysfs-perms
+
+# Force X11 refresh (otherwise some keyboards fail to come back up ??)
+chvt 2 && chvt 7
+
+# Update screens if needed (needs to be done after the chvt line above so that screen status is
+# refreshed)
+if [[ "${XRANDR_STATUS}" != "$(xrandr_get_status)" ]]; then
+	/lib/hotplug.d/screen &
+fi
+
+unset DEVPATH
+rm -f "${INPUT_LIST}"
+
+# Restart network config
+/usr/bin/netd-client -s /var/run/netd
+
+# Second try, just in case...
+if [[ ${BRIGHTNESS} -gt 0 ]]; then
+	echo "${BRIGHTNESS}" > "${BRIGHTNESS_FILE}"
+fi
+
+if [[ -f "/var/run/nonetwork" ]] ; then
+	if [[ -n "${CURRENT_UID}" ]]; then
+		vsctl user enter -u "${CURRENT_UID}" -e XAUTHORITY=/home/user/.Xauthority -- /usr/local/bin/nonetwork &
+	else
+		/usr/local/bin/nonetwork &
+	fi
+fi
+
+# reactivate the touchpad if the mouse has been removed
+if [[ -e "/usr/local/bin/synaptics-settings.sh" ]]; then
+	if [[ -n "${CURRENT_UID}" ]]; then
+	        vsctl user enter -u "${CURRENT_UID}" -e XAUTHORITY=/home/user/.Xauthority -- /usr/local/bin/synaptics-settings.sh init
+	fi
+fi
+
